@@ -141,6 +141,19 @@ class CEOAgent(AgentBase):
     def _persist(self) -> None:
         STATE.save_missions(self.missions)
 
+    async def cancel_runner(self) -> bool:
+        """Cancel the active background mission and wait for it to unwind."""
+        runner = self._runner
+        if not runner or runner.done():
+            return False
+        runner.cancel()
+        try:
+            await runner
+        except asyncio.CancelledError:
+            pass
+        self.log("active mission cancelled by system reset", "warn")
+        return True
+
     # -- public entry -------------------------------------------------------
     async def handle(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
         text = (message or "").strip()

@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
+<canvas id="bgfx" class="bgfx" aria-hidden="true"></canvas>
 <div class="grid-bg" aria-hidden="true"></div>
 <div class="vignette" aria-hidden="true"></div>
 
@@ -32,33 +33,68 @@
   <section class="stage-panel panel">
     <div class="panel-head">
       <h2>Organizational Pipeline</h2>
-      <div class="legend">
-        <span><i class="dot idle"></i>idle</span>
-        <span><i class="dot working"></i>active</span>
-        <span><i class="dot offline"></i>module pending</span>
+      <div class="panel-tools">
+        <div class="legend">
+          <span><i class="dot idle"></i>idle</span>
+          <span><i class="dot working"></i>active</span>
+          <span><i class="dot offline"></i>module pending</span>
+        </div>
+        <button id="previewBtn" class="btn tiny primary" type="button">◱ 4K Preview</button>
       </div>
     </div>
 
-    <div class="stage" id="stage">
+    <h1 class="iso-title">
+      <span class="iso-title-main">MULTI-AGENT AI COMPANY</span>
+      <span class="iso-title-sub">ORGANIZATIONAL WORKFLOW</span>
+    </h1>
+
+    <div class="iso-scene" id="stage">
+      <div class="iso-board" aria-hidden="true">
+        <span class="iso-board-grid"></span>
+      </div>
+
       <svg id="pipes" class="pipes" aria-hidden="true"></svg>
 
-      <div class="col" id="colLeft"></div>
-
-      <button class="hub" id="hub" type="button" data-id="ceo_core" aria-label="Open CEO CORE chat">
-        <span class="hub-rings" aria-hidden="true"><i></i><i></i><i></i></span>
-        <span class="hub-core">
-          <span class="hub-kicker">ORCHESTRATOR</span>
-          <strong>CEO CORE</strong>
-          <span class="hub-status" id="hubStatus">online</span>
-          <span class="hub-bar"><i id="hubBar"></i></span>
-          <small id="hubTask">awaiting directives</small>
+      <button class="iso-orb" id="hub" type="button" data-id="ceo_core" aria-label="Open CEO CORE chat">
+        <span class="orb-halo" aria-hidden="true"></span>
+        <span class="orb-pedestal" aria-hidden="true"><i></i><i></i></span>
+        <span class="orb-sphere">
+          <span class="orb-shine" aria-hidden="true"></span>
+          <strong>CEO</strong>
+          <em>CORE</em>
         </span>
+        <span class="orb-status" id="hubStatus">online</span>
+        <span class="orb-bar"><i id="hubBar"></i></span>
+        <span class="orb-task" id="hubTask">awaiting directives</span>
       </button>
 
-      <div class="col" id="colRight"></div>
+      <div class="iso-towers" id="towers"></div>
+
+      <div class="iso-subs" id="subs">
+        <div class="sub-group" data-group="script">
+          <div class="iso-sub" data-parent="script_writing"><span class="sub-icon">✎</span><span>Plot Planner</span></div>
+          <div class="iso-sub" data-parent="script_writing"><span class="sub-icon">❝</span><span>Dialogue Agent</span></div>
+        </div>
+        <div class="sub-group" data-group="video">
+          <div class="iso-sub" data-parent="video_generation"><span class="sub-icon">▣</span><span>Asset Creator</span></div>
+          <div class="iso-sub" data-parent="video_generation"><span class="sub-icon">◬</span><span>Animator</span></div>
+        </div>
+        <div class="sub-group" data-group="monitor">
+          <div class="iso-sub iso-sub-wide" id="monitorSub" data-parent="video_editing"><span class="sub-icon">◎</span><span>MONITORING / LOGGING</span></div>
+        </div>
+        <div class="sub-group" data-group="seo">
+          <div class="iso-sub" data-parent="seo_agent"><span class="sub-icon">⌕</span><span>Keyword Research</span></div>
+          <div class="iso-sub" data-parent="seo_agent"><span class="sub-icon">▤</span><span>On-Page Opt</span></div>
+        </div>
+      </div>
+
+      <div class="iso-sensor" id="sensorNode" aria-hidden="true">
+        <span class="sensor-led"></span>
+        <span>MONITORING/LOGGING</span>
+      </div>
     </div>
 
-    <p class="stage-hint">Click <b>CEO CORE</b> or any department node to open its isolated chat.</p>
+    <p class="stage-hint">Click <b>CEO CORE</b> or any machine tower to open its isolated chat and API key manager.</p>
   </section>
 
   <aside class="side panel">
@@ -88,6 +124,29 @@
     <button class="btn tiny ghost" id="closeDrawer" type="button" aria-label="Close chat">✕</button>
   </div>
   <div class="drawer-meta" id="drawerMeta"></div>
+
+  <section class="agent-keys" id="agentKeys" aria-label="Per-agent API keys">
+    <div class="agent-keys-head">
+      <span class="agent-keys-title">API KEYS</span>
+      <span class="agent-keys-count" id="agentKeyCount">0</span>
+      <button class="btn tiny ghost" id="toggleAgentKeys" type="button" aria-expanded="true">hide</button>
+    </div>
+    <div class="agent-keys-body" id="agentKeysBody">
+      <div class="agent-keys-provider">
+        <label for="agentProvider">Provider</label>
+        <select id="agentProvider"></select>
+      </div>
+      <ul class="agent-key-list" id="agentKeyList"></ul>
+      <form class="agent-key-form" id="agentKeyForm">
+        <input id="agentKeyValue" type="password" autocomplete="off" spellcheck="false"
+               placeholder="paste a key for this agent…" />
+        <button class="btn tiny primary" type="submit">Add key</button>
+      </form>
+      <p class="agent-keys-hint">Tried in order: active key → other keys → global key.
+        Saved to <code>config/api_keys.json</code> instantly — no restart.</p>
+    </div>
+  </section>
+
   <div class="chat-log" id="chatLog"></div>
   <form class="chat-form" id="chatForm">
     <textarea id="chatInput" rows="2" placeholder="Direct instruction, feedback or approval…" required></textarea>
@@ -95,6 +154,32 @@
   </form>
   <div class="drawer-foot">Ctrl+Enter sends · isolated per-agent context</div>
 </aside>
+
+<!-- 4K pipeline preview -->
+<div id="preview" class="preview" aria-hidden="true" role="dialog" aria-label="4K pipeline preview">
+  <div class="preview-head">
+    <div>
+      <h2>Pipeline Studio — High-Res Preview</h2>
+      <p id="previewMeta">3840 × 2160 · vector render · live state</p>
+    </div>
+    <div class="preview-tools">
+      <label class="preview-res">RES
+        <select id="previewRes">
+          <option value="2160" selected>4K UHD · 3840×2160</option>
+          <option value="1440">QHD · 2560×1440</option>
+          <option value="1080">FHD · 1920×1080</option>
+        </select>
+      </label>
+      <button id="previewDownload" class="btn tiny primary" type="button">Download PNG</button>
+      <button id="previewFull" class="btn tiny ghost" type="button">Fullscreen</button>
+      <button id="closePreview" class="btn tiny ghost" type="button" aria-label="Close preview">✕</button>
+    </div>
+  </div>
+  <div class="preview-stage">
+    <div class="preview-frame" id="previewStage"></div>
+  </div>
+  <p class="preview-note" id="previewNote">Live flow animation · PNG export at the selected resolution</p>
+</div>
 
 <!-- API settings -->
 <div id="settings" class="modal" aria-hidden="true" role="dialog" aria-label="API settings">
@@ -123,7 +208,7 @@
   </div>
 </div>
 
-<div id="toast" class="toast" role="status"></div>
+<div id="toastStack" class="toast-stack" role="status" aria-live="polite"></div>
 
 <script src="/assets/app.js"></script>
 </body>

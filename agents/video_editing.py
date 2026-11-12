@@ -360,55 +360,75 @@ class VideoEditingAgent(AgentBase):
         slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
         return (slug or "video")[:48]
 
-    async def _synthesize(self, segments: List[Dict[str, Any]], provider: str, key: str) -> List[Dict[str, Any]]:
+    async def _synthesize(
+        self, segments: List[Dict[str, Any]], candidates: List[Tuple[str, str]]
+    ) -> List[Dict[str, Any]]:
+        """Render narration, rotating through the agent's TTS keys on failure."""
         results: List[Dict[str, Any]] = []
         AUDIO_DIR.mkdir(parents=True, exist_ok=True)
         slug = self._slug(self.last_edit["title"] if self.last_edit else "video")
         targets = [s for s in segments if s["voiceover"].strip()][:MAX_TTS_SEGMENTS]
+        current = 0
 
         for segment in targets:
             text = segment["voiceover"][:1200]
             target = AUDIO_DIR / f"{slug}-{segment['index']:02d}.mp3"
-            try:
-                if provider == "elevenlabs":
-                    url = ELEVENLABS_TTS.format(voice_id=DEFAULT_ELEVEN_VOICE) + "?output_format=mp3_44100_128"
-                    headers = {
-                        "xi-api-key": key,
-                        "Content-Type": "application/json",
-                        "Accept": "audio/mpeg",
-                    }
-                    payload = {
-                        "text": text,
-                        "model_id": os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
-                        "voice_settings": {"stability": 0.4, "similarity_boost": 0.8},
-                    }
-                else:
-                    url = OPENAI_TTS
-                    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-                    payload = {
-                        "model": os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
-                        "voice": DEFAULT_OPENAI_VOICE,
-                        "input": text,
-                        "response_format": "mp3",
-                    }
-                audio = await asyncio.to_thread(_post_bytes, url, payload, headers)
-                target.write_bytes(audio)
-                segment["audio"] = str(target.relative_to(BASE_DIR))
-                results.append(
-                    {
-                        "index": segment["index"],
-                        "file": segment["audio"],
-                        "bytes": len(audio),
-                        "provider": provider,
-                    }
-                )
-                self.set_state(
-                    progress=min(90, 60 + segment["index"] * 4),
-                    current_task=f"voiceover {segment['index']}/{len(targets)}",
-                )
-            except (RuntimeError, OSError) as exc:
-                results.append({"index": segment["index"], "error": str(exc), "provider": provider})
-                self.log(f"voiceover segment {segment['index']} failed: {exc}", "warn")
+            last_error = ""
+            for attempt in range(len(candidates)):
+                provider, key = candidates[current % len(candidates)]
+                try:
+                    if provider == "elevenlabs":
+                        url = ELEVENLABS_TTS.format(voice_id=DEFAULT_ELEVEN_VOICE) + "?output_format=mp3_44100_128"
+                        headers = {
+                            "xi-api-key": key,
+                            "Content-Type": "application/json",
+                            "Accept": "audio/mpeg",
+                        }
+                        payload = {
+                            "text": text,
+                            "model_id": os.environ.get("ELEVENLABS_MODEL", "eleven_multilingual_v2"),
+                            "voice_settings": {"stability": 0.4, "similarity_boost": 0.8},
+                        }
+                    else:
+                        url = OPENAI_TTS
+                        headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+                        payload = {
+                            "model": os.environ.get("OPENAI_TTS_MODEL", "gpt-4o-mini-tts"),
+                            "voice": DEFAULT_OPENAI_VOICE,
+                            "input": text,
+                            "response_format": "mp3",
+                        }
+                    audio = await asyncio.to_thread(_post_bytes, url, payload, headers)
+                    target.write_bytes(audio)
+                    segment["audio"] = str(target.relative_to(BASE_DIR))
+                    results.append(
+                        {
+                            "index": segment["index"],
+                            "file": segment["audio"],
+                            "bytes": len(audio),
+                            "provider": provider,
+                        }
+                    )
+                    self.set_state(
+                        progress=min(90, 60 + segment["index"] * 4),
+                        current_task=f"voiceover {segment['index']}/{len(targets)}",
+                    )
+                    break
+                except (RuntimeError, OSError) as exc:
+                    last_error = str(exc)
+                    self.log(
+                        f"voiceover segment {segment['index']} failed via {provider}: {exc}",
+                        "warn",
+                    )
+                    current += 1
+                    if attempt == len(candidates) - 1:
+                        results.append(
+                            {
+                                "index": segment["index"],
+                                "error": f"all {len(candidates)} key(s) failed: {last_error}",
+                                "provider": provider,
+                            }
+                        )
         return results
 
     # -- pipeline -----------------------------------------------------------
@@ -465,14 +485,15 @@ class VideoEditingAgent(AgentBase):
             )
         self.last_report = report
 
-        provider, key = self.keys.resolve_for_agent(self.id)
+        tts_candidates = self.keys.candidates(self.id, ["elevenlabs", "openai"])
         audio: List[Dict[str, Any]] = []
         audio_note = "not requested"
         if synthesize:
-            if provider in ("elevenlabs", "openai") and key:
+            if tts_candidates:
+                provider = tts_candidates[0][0]
                 self.set_state(progress=60, current_task=f"synthesising voiceover via {provider}")
-                self.log(f"voiceover via {provider}")
-                audio = await self._synthesize(edl["segments"], str(provider), str(key))
+                self.log(f"voiceover via {provider} ({len(tts_candidates)} key(s) in pool)")
+                audio = await self._synthesize(edl["segments"], tts_candidates)
                 generated = [a for a in audio if "file" in a]
                 failures = [a for a in audio if "error" in a]
                 audio_note = f"{len(generated)} file(s) generated in data/audio"

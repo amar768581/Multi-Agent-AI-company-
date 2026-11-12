@@ -55,6 +55,20 @@ JSON keys, command words) stay in English. Comments and section labels also loca
 Bengali-capable, so the pipeline works without any provider key; with a Gemini/Groq/OpenAI
 key, `core/llm.py` instructs the model to answer in the requested language.
 
+## Per-agent key pools
+
+Every chat drawer has its own **API KEYS** box. Pick the provider for that agent
+(Gemini, Groq, OpenAI, HeyGen, ElevenLabs), then add up to 8 keys; each row can be made
+active, edited or deleted, and the top badge shows how many are stored. Keys are tried in
+order — **active key → remaining pool keys → the global key from API Settings** — so an
+invalid key, a rate limit (HTTP 429) or a provider outage rolls over to the next key, then
+to the deterministic offline writer if the whole pool fails. Script, ebook, lead and SEO
+text generation, HeyGen renders and ElevenLabs/OpenAI voiceovers all follow that order.
+
+Everything is saved immediately to `config/api_keys.json` (`agent_keys` / `agent_active`)
+and applied to the next message — no restart. The UI only ever receives masked values;
+raw keys never appear in responses, logs or the chat transcript.
+
 ## State survives restarts
 
 Chat histories, missions, deliverables **and each department's working artifact** are
@@ -126,8 +140,14 @@ as well as in-memory state (API keys are untouched).
 
 ## What Phase 1 ships
 
-- Animated pipeline: CEO CORE hub + 6 department nodes, live status, progress, and
-  flowing data-pipe animation.
+- Animated pipeline: CEO CORE hub + 6 department nodes with live data-flow pipes
+  (glowing packets that speed up while a department works), live status and progress.
+- **4K Pipeline Studio** preview: a 3840 × 2160 vector render of the live pipeline with
+  status/task/progress, PNG export at 4K/QHD/FHD, and fullscreen.
+- 3D isometric workflow board matching the reference art: golden CEO CORE orb, six
+  colour-coded machine towers with animated bays, sub-agent pedestals, right-angled glass
+  tubes with flowing energy packets, and a live notification stack (mission, department
+  status and API-key events) whose department toasts open the matching chat drawer.
 - Per-agent chat drawers (CEO CORE fully functional; departments answer as
   "module pending" until Phase 2 files land).
 - **API Settings** panel: separate keys for Gemini, Groq, OpenAI, ElevenLabs, HeyGen,

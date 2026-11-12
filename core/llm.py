@@ -14,7 +14,7 @@ import json
 import os
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 SUPPORTED_PROVIDERS = ("gemini", "groq", "openai")
 
@@ -90,6 +90,36 @@ async def generate(
         max_tokens,
         timeout,
     )
+
+
+async def generate_first(
+    candidates: List[Any],
+    system: str,
+    prompt: str,
+    **kwargs: Any,
+) -> Tuple[str, str]:
+    """Try each ``(provider, key)`` in order and return ``(text, provider)``.
+
+    Used for per-agent key pools: an invalid key, a rate limit (HTTP 429) or a
+    transient provider failure falls through to the next key instead of forcing
+    the agent straight into its offline template.
+    """
+    errors: List[str] = []
+    for item in candidates:
+        if isinstance(item, dict):
+            provider, key = item.get("provider"), item.get("key")
+        else:
+            provider, key = (list(item) + [None, None])[:2]
+        if not supports(provider) or not key:
+            continue
+        try:
+            text = await generate(str(provider), str(key), system, prompt, **kwargs)
+            return text, str(provider)
+        except LLMError as exc:
+            errors.append(f"{provider}: {exc}")
+    if errors:
+        raise LLMError("all provider keys failed — " + " | ".join(errors))
+    raise LLMError("no usable text provider key")
 
 
 def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int) -> Dict[str, Any]:

@@ -7,6 +7,7 @@ Run:
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -17,13 +18,40 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from config.api_keys import ApiKeyStore
-from core.events import EventBus
-from core.registry import AgentRegistry
-from core.store import STATE
-
 BASE_DIR = Path(__file__).resolve().parent
 FRONTEND_DIR = BASE_DIR / "frontend"
+
+
+def _load_env_file(path: Path) -> None:
+    """Load KEY=VALUE pairs from .env into os.environ before agents import.
+
+    Real environment variables always win, so a Termux/CI export can override
+    the file. Loaded before core.registry because agents read settings such as
+    HEYGEN_AVATAR_ID at import time.
+    """
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        name, _, value = line.partition("=")
+        name = name.strip()
+        value = value.strip().strip("\"'")
+        if name and value and name not in os.environ:
+            os.environ[name] = value
+
+
+_load_env_file(BASE_DIR / ".env")
+
+from config.api_keys import ApiKeyStore  # noqa: E402
+from core.events import EventBus  # noqa: E402
+from core.registry import AgentRegistry  # noqa: E402
+from core.store import STATE  # noqa: E402
 
 bus = EventBus()
 keys = ApiKeyStore()
@@ -66,6 +94,18 @@ class AssignmentIn(BaseModel):
     provider: str
 
 
+class AgentKeyIn(BaseModel):
+    provider: str = Field(..., min_length=2, max_length=32)
+    value: str = Field(..., min_length=1, max_length=4096)
+    label: Optional[str] = Field(None, max_length=40)
+
+
+class AgentKeyUpdate(BaseModel):
+    value: Optional[str] = Field(None, min_length=1, max_length=4096)
+    provider: Optional[str] = Field(None, min_length=2, max_length=32)
+    label: Optional[str] = Field(None, max_length=40)
+
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -81,6 +121,7 @@ def build_state(since_log: int = 0) -> Dict[str, Any]:
         "settings": {
             "configured": keys.configured_slugs(),
             "assignments": keys.assignments(),
+            "agent_keys": keys.agent_key_summary(),
         },
         "server_time": __import__("time").time(),
     }
@@ -91,7 +132,7 @@ def health() -> Dict[str, Any]:
     return {
         "ok": True,
         "app": "CogniSphere Labs",
-        "phase": 7,
+        "phase": 8,
         "departments_live": sum(1 for a in registry.all_agents() if a.module_status == "live"),
         "departments_total": len(registry.all_agents()),
         "keys_configured": keys.configured_slugs(),
@@ -196,9 +237,86 @@ def assign_key(payload: AssignmentIn) -> Dict[str, Any]:
     return {"result": result, "settings": keys.masked_state()}
 
 
+def _provider_label(slug: str) -> str:
+    return next((p["label"] for p in keys.catalog() if p["slug"] == slug), slug)
+
+
+def _require_agent(agent_id: str):
+    agent = registry.get(agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail=f"Unknown agent '{agent_id}'")
+    return agent
+
+
+@app.get("/api/agents/{agent_id}/keys")
+def agent_keys(agent_id: str) -> Dict[str, Any]:
+    """Masked key pool for one agent/chat panel."""
+    _require_agent(agent_id)
+    return keys.agent_key_state(agent_id)
+
+
+@app.post("/api/agents/{agent_id}/keys")
+def add_agent_key(agent_id: str, payload: AgentKeyIn) -> Dict[str, Any]:
+    _require_agent(agent_id)
+    try:
+        result = keys.add_agent_key(agent_id, payload.provider, payload.value, payload.label or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    bus.log(
+        "success",
+        agent_id,
+        f"{_provider_label(payload.provider)} key added — {result['state']['count']} key(s) in pool",
+    )
+    return result
+
+
+@app.put("/api/agents/{agent_id}/keys/{key_id}")
+def update_agent_key(agent_id: str, key_id: str, payload: AgentKeyUpdate) -> Dict[str, Any]:
+    _require_agent(agent_id)
+    try:
+        state = keys.update_agent_key(
+            agent_id, key_id, payload.value, payload.provider, payload.label
+        )
+    except ValueError as exc:
+        code = 404 if "Unknown key" in str(exc) else 422
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    bus.log("info", agent_id, "API key updated")
+    return state
+
+
+@app.delete("/api/agents/{agent_id}/keys/{key_id}")
+def delete_agent_key(agent_id: str, key_id: str) -> Dict[str, Any]:
+    _require_agent(agent_id)
+    try:
+        state = keys.delete_agent_key(agent_id, key_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    bus.log("warn", agent_id, f"API key removed — {state['count']} key(s) left")
+    return state
+
+
+@app.post("/api/agents/{agent_id}/keys/{key_id}/activate")
+def activate_agent_key(agent_id: str, key_id: str) -> Dict[str, Any]:
+    _require_agent(agent_id)
+    try:
+        state = keys.activate_agent_key(agent_id, key_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    active = next((k for k in state["keys"] if k["id"] == key_id), {})
+    bus.log(
+        "info",
+        agent_id,
+        f"active key → {_provider_label(active.get('provider', ''))} {active.get('masked', '')}",
+    )
+    return state
+
+
 @app.post("/api/system/reset")
-def reset() -> Dict[str, Any]:
-    """Clear chat history + monitor log (keys are untouched)."""
+async def reset() -> Dict[str, Any]:
+    """Clear chat history + monitor log (keys untouched) and cancel active execution."""
+    cancelled = False
+    if registry.ceo:
+        cancelled = await registry.ceo.cancel_runner()
     for agent in registry.all_agents():
         agent.history.clear()
     if registry.ceo:
@@ -207,7 +325,10 @@ def reset() -> Dict[str, Any]:
         registry.ceo.set_state(status="online", progress=0, current_task="")
     bus.clear()
     STATE.clear()
-    bus.log("info", "system", "session state reset — API keys preserved, persisted chats cleared")
+    note = "session state reset — API keys preserved, persisted chats cleared"
+    if cancelled:
+        note += "; running mission cancelled"
+    bus.log("info", "system", note)
     return build_state()
 
 

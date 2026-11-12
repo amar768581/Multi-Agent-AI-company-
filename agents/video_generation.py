@@ -488,27 +488,36 @@ class VideoGenerationAgent(AgentBase):
             source = self._sanitize(source)
             report = self._gate(source)
 
-        provider, key = self.keys.resolve_for_agent(self.id)
+        provider, _ = self.keys.resolve_for_agent(self.id)
+        heygen_keys = self.keys.candidates(self.id, ["heygen"])
         render: Dict[str, Any] = {}
         payload = self._heygen_payload(source["shots"], text, total)
         avatar_id = os.environ.get("HEYGEN_AVATAR_ID", "").strip()
         voice_id = os.environ.get("HEYGEN_VOICE_ID", "").strip()
 
-        if provider == "heygen" and key and avatar_id and voice_id:
-            self.set_state(progress=70, current_task="submitting HeyGen render")
-            try:
-                render = await self._submit(payload, str(key))
-                self.log(f"HeyGen render submitted ({render['video_id']})", "success")
-            except RuntimeError as exc:
-                render = {"submitted": False, "error": str(exc)}
-                self.log(f"HeyGen submit failed: {exc}", "warn")
-        elif provider == "heygen" and key:
+        if not avatar_id or not voice_id:
             render = {
                 "submitted": False,
                 "error": "HEYGEN_AVATAR_ID / HEYGEN_VOICE_ID not set — storyboard ready, not submitted",
             }
-        else:
+        elif not heygen_keys:
             render = {"submitted": False, "error": "no HeyGen key assigned"}
+        else:
+            self.set_state(progress=70, current_task="submitting HeyGen render")
+            failures = 0
+            for index, (_, key) in enumerate(heygen_keys, start=1):
+                try:
+                    render = await self._submit(payload, str(key))
+                    self.log(
+                        f"HeyGen render submitted ({render['video_id']})"
+                        + (f" using key {index} after {failures} failure(s)" if failures else ""),
+                        "success",
+                    )
+                    break
+                except RuntimeError as exc:
+                    failures += 1
+                    render = {"submitted": False, "error": str(exc)}
+                    self.log(f"HeyGen key {index} failed: {exc}", "warn")
 
         source["render"] = render
         source["provider"] = provider

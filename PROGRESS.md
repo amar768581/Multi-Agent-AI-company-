@@ -3,7 +3,7 @@
 > **Session protocol:** Read this file first. Resume from *Exact Next Step* only.
 > Never rewrite an existing module — extend it or replace it in place with a note here.
 
-Last updated: Session 7 (Phase 7 — department working artifacts survive restarts)
+Last updated: Session 10 (Phase 10 — 3D isometric workflow UI, live toasts, audit fixes)
 
 ---
 
@@ -11,8 +11,8 @@ Last updated: Session 7 (Phase 7 — department working artifacts survive restar
 
 | Field | Value |
 |---|---|
-| Phase | Phase 7 — every department resumes its last script/storyboard/book/campaign/SEO package after a restart |
-| Session | 7 |
+| Phase | Phase 10 — 3D isometric workflow board, live notification stack, hardened reset + .env bootstrap |
+| Session | 10 |
 | Backend | FastAPI (Termux-friendly, no compiled extras) |
 | Frontend | Vanilla HTML/CSS/JS served by FastAPI |
 | Departments live | **6 / 6** + compliance gate |
@@ -111,11 +111,67 @@ Last updated: Session 7 (Phase 7 — department working artifacts survive restar
 - [x] `main.py` — `/api/health` reports `phase: 7`; persistence summary includes
       `agents_with_artifacts`.
 
+### Phase 8 — per-agent key pools
+- [x] `config/api_keys.py` — second-generation store (`version: 2`) with
+      `agent_keys` / `agent_active`: each agent holds 1–8 keys (any of Gemini, Groq,
+      OpenAI, HeyGen, ElevenLabs), one active key, and an ordered `candidates()` list
+      (active → other pool keys → legacy global key), deduplicated by value.
+      Add / edit / delete / activate are validated (whitespace, duplicates, prefix
+      warnings, max pool size) and every response is masked.
+- [x] `core/llm.py` — `generate_first(candidates, …)` tries each pool key in order and
+      only raises after all of them fail, so a bad key, HTTP 429 or provider outage falls
+      through to the next key instead of dropping straight to the offline template.
+- [x] Script, ebook, lead, SEO use `generate_first`; VIDEO GENERATION rotates through
+      HeyGen keys on submit failure; VIDEO EDITING rotates TTS keys per segment.
+- [x] `main.py` — `GET/POST /api/agents/{id}/keys`,
+      `PUT/DELETE /api/agents/{id}/keys/{key_id}`,
+      `POST /api/agents/{id}/keys/{key_id}/activate`; provider switching uses the existing
+      assignments endpoint. Every change writes `config/api_keys.json` immediately, so keys
+      apply to the next message without a restart. `/api/state` settings expose
+      `agent_keys` counts and logs record add/remove/activate (masked only).
+- [x] `frontend/index.html` + `app.js` + `styles.css` — an inline **API KEYS** box inside
+      every chat drawer: provider selector, key list with active badge, per-row
+      Use / Edit / Delete, add form, collapse toggle and the fallback-order hint.
+
+### Phase 9 — animated pipeline + 4K preview
+- [x] `frontend/app.js` — `drawPipes()` now builds an SVG graph once per layout and updates
+      it in place: curved CEO CORE → department lines, dash flow and two glowing data
+      packets per pipe. Idle pipes drift slowly at low opacity; working/mission pipes run
+      bright and fast, so the flow reflects real agent state without rebuilding the SVG on
+      every poll (no animation stutter).
+- [x] **Pipeline Studio** preview (stage panel → `◱ 4K Preview`): a dedicated 3840 × 2160
+      vector scene with the hub, all six department cards, live status/progress/task text,
+      animated pipes, legend and timestamp. Updates live while open and can be exported as
+      a PNG at 4K UHD, QHD or FHD, plus fullscreen. Export is client-side canvas
+      rasterisation — no new dependency, no backend change.
+- [x] `frontend/index.html` + `styles.css` — preview button in the panel head and the
+      full-screen modal (resolution picker, Download PNG, Fullscreen, Esc to close).
+
+### Phase 10 — 3D isometric workflow UI + live notifications
+- [x] `frontend/index.html` + `styles.css` — stage rebuilt as the reference image: obsidian
+      angled board with a glowing golden edge, metallic title, gold CEO CORE orb on a ring
+      pedestal, six colour-coded machine towers (blue script, orange video gen, teal
+      editing, purple ebook, green leads, gold SEO) with emblems, animated front bays
+      (paper feed, cascading frames, timeline, holographic scroll, avatar network, chart)
+      and sub-agent pedestals (Plot Planner, Dialogue Agent, Asset Creator, Animator,
+      MONITORING/LOGGING + sensor node, Keyword Research, On-Page Opt).
+- [x] `frontend/app.js` — right-angled glass tubes from the orb to each tower and from each
+      tower to its sub-agents, with colour-matched dash flow and glowing energy packets;
+      idle pipes drift, working pipes speed up. Pipes rebuild only when layout changes.
+- [x] Live toast stack (top-right, gold border, slide-in/fade, 6s auto-dismiss, click to
+      open the department drawer): mission planned/started/completed, task delegation,
+      department working/completed/error/offline, and API key added/removed/activated or
+      fallback events from the backend log.
+- [x] 4K Preview Studio now renders the exact isometric scene (board, orb, six towers, bays,
+      sub-agent pedestals, tubes) and exports a verified 3840 × 2160 PNG.
+- [x] Audit — `main.py` loads `.env` into `os.environ` before agent imports (real env wins),
+      and `POST /api/system/reset` now awaits `CEOAgent.cancel_runner()` so an active
+      background mission is cancelled and its task unwinds before state is cleared.
+
 ## Current Active Task
 
-Phase 7 verified. After a restart, every department resumes from its saved artifact:
-`চ্যাপ্টার ২ লেখো`, `রিভাইজ: …`, `শেষ স্ক্রিপ্টের ভিডিও বানাও`, `optimize the last video`
-and `status` continue the previous session's work.
+Phase 10 verified in a browser: iso layout, live tubes, toast stack, drawer/API keys and
+4K export all working.
 
 ## Pending Work (hardening, not features)
 
@@ -127,9 +183,8 @@ and `status` continue the previous session's work.
 
 ## Exact Next Step
 
-Verify the live-provider paths (Gemini/Groq/OpenAI, HeyGen, ElevenLabs) with real keys,
-starting with the Bengali language directive and the JSON contracts. Update this file
-before anything else.
+Add a real key in a chat drawer's API KEYS box and verify the live path (Bengali output,
+fallback to the second key, HeyGen/TTS rendering). Update this file before anything else.
 
 ---
 

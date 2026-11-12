@@ -131,11 +131,13 @@ class LeadGenerationAgent(AgentBase):
         )
 
     def _status(self) -> str:
-        provider, key = self.keys.resolve_for_agent(self.id)
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
+        provider, key = candidates[0] if candidates else (None, None)
+        pool = len(candidates)
         if self.lang == "bn":
             lines = [
                 "লিড জেনারেশন — স্ট্যাটাস",
-                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'})",
+                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'}) · কী পুল: {pool}",
             ]
             if self.last_campaign:
                 lines += [
@@ -149,7 +151,7 @@ class LeadGenerationAgent(AgentBase):
             return "\n".join(lines)
         lines = [
             "LEAD GENERATION — status",
-            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'})",
+            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'}) · key pool: {pool}",
         ]
         if self.last_campaign:
             lines += [
@@ -545,22 +547,23 @@ class LeadGenerationAgent(AgentBase):
         self.set_state(status="working", progress=10, current_task=f"campaign: {offer[:48]}")
         self.log(f"lead campaign brief — {offer[:80]}")
 
-        provider, key = self.keys.resolve_for_agent(self.id)
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
         campaign: Optional[Dict[str, Any]] = None
         note = ""
 
-        if llm.supports(provider) and key:
-            self.set_state(progress=35, current_task=f"building ICP with {provider}")
+        if candidates:
+            self.set_state(progress=35, current_task=f"building ICP with {candidates[0][0]}")
             try:
-                raw = await llm.generate(
-                    str(provider),
-                    str(key),
+                raw, used = await llm.generate_first(
+                    candidates,
                     PLAN_PROMPT.format(rules=rules.compliance_brief()),
                     f"Offer: {offer}\nDirective: {text}\nBuild 3 segments and a 4-touch sequence.",
                     temperature=0.7,
                     max_tokens=2400,
                     language=self.lang,
                 )
+                if used != candidates[0][0]:
+                    note = f"key fallback → {used} after a provider failure"
                 parsed = self._parse_json(raw)
                 if parsed and parsed.get("sequence"):
                     campaign = {

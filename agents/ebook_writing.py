@@ -211,11 +211,8 @@ class EbookWritingAgent(AgentBase):
         }
 
     # -- provider helpers ---------------------------------------------------
-    def _text_provider(self) -> Tuple[Optional[str], Optional[str]]:
-        provider, key = self.keys.resolve_for_agent(self.id)
-        if llm.supports(provider) and key:
-            return provider, key
-        return None, None
+    def _text_candidates(self) -> List[Tuple[str, str]]:
+        return self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
 
     def _parse_json(self, raw: str) -> Optional[Dict[str, Any]]:
         cleaned = re.sub(r"^```(?:json)?", "", raw.strip()).strip()
@@ -350,19 +347,18 @@ class EbookWritingAgent(AgentBase):
 
     async def _start(self, text: str) -> str:
         brief = self._parse_brief(text)
-        provider, key = self._text_provider()
-        mode = provider or "offline template"
+        candidates = self._text_candidates()
+        mode = candidates[0][0] if candidates else "offline template"
         self.set_state(status="working", progress=8, current_task=f"outline: {brief['topic'][:46]}")
         self.log(f"ebook brief — {brief['chapters']} chapters · {brief['audience']}")
 
         book: Optional[Dict[str, Any]] = None
         note = ""
-        if provider and key:
-            self.set_state(progress=25, current_task=f"outlining with {provider}")
+        if candidates:
+            self.set_state(progress=25, current_task=f"outlining with {candidates[0][0]}")
             try:
-                raw = await llm.generate(
-                    provider,
-                    key,
+                raw, used = await llm.generate_first(
+                    candidates,
                     OUTLINE_PROMPT.format(rules=rules.compliance_brief()),
                     "\n".join(
                         [
@@ -376,6 +372,8 @@ class EbookWritingAgent(AgentBase):
                     max_tokens=2200,
                     language=self.lang,
                 )
+                if used != candidates[0][0]:
+                    note = f"key fallback → {used} after a provider failure"
                 parsed = self._parse_json(raw)
                 if parsed and parsed.get("chapters"):
                     book = {
@@ -509,13 +507,12 @@ class EbookWritingAgent(AgentBase):
         if not chapter:
             return None
 
-        provider, key = self._text_provider()
+        candidates = self._text_candidates()
         text: Optional[str] = None
-        if provider and key:
+        if candidates:
             try:
-                raw = await llm.generate(
-                    provider,
-                    key,
+                raw, _ = await llm.generate_first(
+                    candidates,
                     CHAPTER_PROMPT.format(rules=rules.compliance_brief()),
                     "\n".join(
                         [
@@ -678,11 +675,13 @@ class EbookWritingAgent(AgentBase):
 
     # -- status / reply -----------------------------------------------------
     def _status(self) -> str:
-        provider, key = self._text_provider()
+        candidates = self._text_candidates()
+        provider, key = candidates[0] if candidates else (None, None)
+        pool = len(candidates)
         if self.lang == "bn":
             lines = [
                 "ইবুক রাইটিং — স্ট্যাটাস",
-                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'})",
+                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'}) · কী পুল: {pool}",
             ]
             if self.book:
                 drafted = len(self.book["chapters"])
@@ -700,7 +699,7 @@ class EbookWritingAgent(AgentBase):
             return "\n".join(lines)
         lines = [
             "EBOOK WRITING — status",
-            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'})",
+            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'}) · key pool: {pool}",
         ]
         if self.book:
             drafted = len(self.book["chapters"])

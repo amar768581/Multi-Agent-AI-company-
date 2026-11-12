@@ -173,12 +173,14 @@ class ScriptWritingAgent(AgentBase):
         )
 
     def _status(self) -> str:
-        provider, key = self.keys.resolve_for_agent(self.id)
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
+        provider, key = candidates[0] if candidates else (None, None)
+        pool = len(candidates)
         if self.lang == "bn":
             lines = [
                 "স্ক্রিপ্ট রাইটিং — স্ট্যাটাস",
                 f"মডিউল: চালু · মোড: {'লাইভ LLM' if (llm.supports(provider) and key) else 'অফলাইন টেমপ্লেট'}",
-                f"প্রোভাইডার: {provider or 'নেই'} ({'কী সেট আছে' if key else 'কী নেই'})",
+                f"প্রোভাইডার: {provider or 'নেই'} ({'কী সেট আছে' if key else 'কী নেই'}) · কী পুল: {pool}",
             ]
             if self.last_script and self.last_report:
                 lines += [
@@ -192,7 +194,7 @@ class ScriptWritingAgent(AgentBase):
         lines = [
             "SCRIPT WRITING — status",
             f"Module: live · mode: {'live LLM' if (llm.supports(provider) and key) else 'offline template'}",
-            f"Provider: {provider or 'none'} ({'key set' if key else 'no key'})",
+            f"Provider: {provider or 'none'} ({'key set' if key else 'no key'}) · key pool: {pool}",
         ]
         if self.last_script and self.last_report:
             lines += [
@@ -295,9 +297,10 @@ class ScriptWritingAgent(AgentBase):
     # -- generation ---------------------------------------------------------
     async def _produce(self, brief: Dict[str, Any], revision_note: str = "") -> str:
         topic = brief["topic"]
-        provider, key = self.keys.resolve_for_agent(self.id)
-        live = bool(llm.supports(provider) and key)
-        mode = provider if live else "offline template"
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
+        live = bool(candidates)
+        mode = candidates[0][0] if live else "offline template"
+        used_provider: Optional[str] = None
 
         self.set_state(status="working", progress=5, current_task=f"brief: {topic[:52]}")
         self.log(f"script brief received — {brief['duration']}s · {brief['platform']} · {brief['tone']}")
@@ -306,17 +309,19 @@ class ScriptWritingAgent(AgentBase):
         note = ""
 
         if live:
-            self.set_state(progress=25, current_task="writing draft with " + str(provider))
+            self.set_state(progress=25, current_task="writing draft with " + str(candidates[0][0]))
             try:
-                raw = await llm.generate(
-                    str(provider),
-                    str(key),
+                raw, used_provider = await llm.generate_first(
+                    candidates,
                     SYSTEM_PROMPT.format(rules=rules.compliance_brief()),
                     self._build_prompt(brief, revision_note),
                     temperature=0.75,
                     max_tokens=2800,
                     language=self.lang,
                 )
+                if used_provider != candidates[0][0]:
+                    note = f"key fallback → {used_provider} after a provider failure"
+                    mode = used_provider
                 script = self._parse_model_json(raw)
                 if script is None:
                     note = "provider returned non-JSON; draft discarded"
@@ -343,7 +348,7 @@ class ScriptWritingAgent(AgentBase):
 
         if report["blockers"] and live:
             self.set_state(progress=80, current_task="rewriting blocked sections with provider")
-            revised = await self._llm_repair(script, report, brief, str(provider), str(key))
+            revised = await self._llm_repair(script, report, brief, candidates)
             if revised is not None:
                 script = self._normalize_script(revised, brief)
                 script, fixes = self._sanitize_script(script)
@@ -352,7 +357,7 @@ class ScriptWritingAgent(AgentBase):
 
         self.last_script = script
         self.last_report = report
-        self.last_mode = mode if not live else str(provider)
+        self.last_mode = used_provider or mode
         self.persist_artifacts()
 
         self.set_state(
@@ -404,13 +409,11 @@ class ScriptWritingAgent(AgentBase):
         script: Dict[str, Any],
         report: Dict[str, Any],
         brief: Dict[str, Any],
-        provider: str,
-        key: str,
+        candidates: List[Tuple[str, str]],
     ) -> Optional[Dict[str, Any]]:
         try:
-            raw = await llm.generate(
-                provider,
-                key,
+            raw, _ = await llm.generate_first(
+                candidates,
                 SYSTEM_PROMPT.format(rules=rules.compliance_brief()),
                 "\n".join(
                     [

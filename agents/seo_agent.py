@@ -155,11 +155,13 @@ class SEOAgent(AgentBase):
         )
 
     def _status(self) -> str:
-        provider, key = self.keys.resolve_for_agent(self.id)
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
+        provider, key = candidates[0] if candidates else (None, None)
+        pool = len(candidates)
         if self.lang == "bn":
             lines = [
                 "এসইও এজেন্ট — স্ট্যাটাস",
-                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'})",
+                f"প্রোভাইডার: {provider or 'অফলাইন টেমপ্লেট'} ({'কী সেট আছে' if key else 'কী নেই'}) · কী পুল: {pool}",
             ]
             if self.last_package:
                 lines += [
@@ -173,7 +175,7 @@ class SEOAgent(AgentBase):
             return "\n".join(lines)
         lines = [
             "SEO AGENT — status",
-            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'})",
+            f"Provider: {provider or 'offline template'} ({'key set' if key else 'no key'}) · key pool: {pool}",
         ]
         if self.last_package:
             lines += [
@@ -472,20 +474,19 @@ class SEOAgent(AgentBase):
         self.set_state(status="working", progress=10, current_task=f"optimising: {source['title'][:46]}")
         self.log(f"seo source: {source['origin']}")
 
-        provider, key = self.keys.resolve_for_agent(self.id)
+        candidates = self.keys.candidates(self.id, list(llm.SUPPORTED_PROVIDERS))
         package: Optional[Dict[str, Any]] = None
         note = ""
 
-        if llm.supports(provider) and key:
-            self.set_state(progress=40, current_task=f"writing metadata with {provider}")
+        if candidates:
+            self.set_state(progress=40, current_task=f"writing metadata with {candidates[0][0]}")
             scenes = "\n".join(
                 f"{scene.get('time', '')} — {str(scene.get('voiceover', ''))[:120]}"
                 for scene in source["scenes"]
             )
             try:
-                raw = await llm.generate(
-                    str(provider),
-                    str(key),
+                raw, used = await llm.generate_first(
+                    candidates,
                     SEO_PROMPT.format(rules=rules.compliance_brief()),
                     "\n".join(
                         [
@@ -501,6 +502,8 @@ class SEOAgent(AgentBase):
                     max_tokens=1800,
                     language=self.lang,
                 )
+                if used != candidates[0][0]:
+                    note = f"key fallback → {used} after a provider failure"
                 parsed = self._parse_json(raw)
                 if parsed and parsed.get("title") and parsed.get("description"):
                     parsed["provider"] = str(provider)
