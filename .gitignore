@@ -1,0 +1,17 @@
+# secrets / local state
+.env
+config/api_keys.json
+config/api_keys.json.tmp
+data/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# termux / editor noise
+.DS_Store
+*.log
+*.pid

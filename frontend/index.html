@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#050810" />
+<title>CogniSphere Labs — Agent Pipeline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+<div class="grid-bg" aria-hidden="true"></div>
+<div class="vignette" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">◈</div>
+    <div class="brand-text">
+      <h1>COGNISPHERE <span>LABS</span></h1>
+      <p>Multi-Agent AI Company · live organizational pipeline</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div class="stat"><span id="liveCount">0/6</span><small>DEPT LIVE</small></div>
+    <div class="stat"><span id="keyCount">0</span><small>KEYS SET</small></div>
+    <div class="stat"><span id="missionCount">0</span><small>MISSIONS</small></div>
+    <button id="settingsBtn" class="btn ghost" type="button">⚙ API Settings</button>
+  </div>
+</header>
+
+<main class="layout">
+  <section class="stage-panel panel">
+    <div class="panel-head">
+      <h2>Organizational Pipeline</h2>
+      <div class="legend">
+        <span><i class="dot idle"></i>idle</span>
+        <span><i class="dot working"></i>active</span>
+        <span><i class="dot offline"></i>module pending</span>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <svg id="pipes" class="pipes" aria-hidden="true"></svg>
+
+      <div class="col" id="colLeft"></div>
+
+      <button class="hub" id="hub" type="button" data-id="ceo_core" aria-label="Open CEO CORE chat">
+        <span class="hub-rings" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="hub-core">
+          <span class="hub-kicker">ORCHESTRATOR</span>
+          <strong>CEO CORE</strong>
+          <span class="hub-status" id="hubStatus">online</span>
+          <span class="hub-bar"><i id="hubBar"></i></span>
+          <small id="hubTask">awaiting directives</small>
+        </span>
+      </button>
+
+      <div class="col" id="colRight"></div>
+    </div>
+
+    <p class="stage-hint">Click <b>CEO CORE</b> or any department node to open its isolated chat.</p>
+  </section>
+
+  <aside class="side panel">
+    <div class="panel-head">
+      <h2>Live Monitor</h2>
+      <button id="resetBtn" class="btn tiny ghost" type="button">reset session</button>
+    </div>
+    <div id="logs" class="logs" aria-live="polite"></div>
+
+    <div class="panel-head sub">
+      <h3>Missions</h3>
+    </div>
+    <div id="missions" class="missions"></div>
+  </aside>
+</main>
+
+<div id="scrim" class="scrim"></div>
+
+<!-- per-agent chat drawer -->
+<aside id="drawer" class="drawer" aria-hidden="true" aria-label="Agent chat">
+  <div class="drawer-head">
+    <span class="drawer-accent" id="drawerAccent"></span>
+    <div class="drawer-title">
+      <h3 id="drawerName">—</h3>
+      <p id="drawerRole">—</p>
+    </div>
+    <button class="btn tiny ghost" id="closeDrawer" type="button" aria-label="Close chat">✕</button>
+  </div>
+  <div class="drawer-meta" id="drawerMeta"></div>
+  <div class="chat-log" id="chatLog"></div>
+  <form class="chat-form" id="chatForm">
+    <textarea id="chatInput" rows="2" placeholder="Direct instruction, feedback or approval…" required></textarea>
+    <button class="btn primary" id="sendBtn" type="submit">Send</button>
+  </form>
+  <div class="drawer-foot">Ctrl+Enter sends · isolated per-agent context</div>
+</aside>
+
+<!-- API settings -->
+<div id="settings" class="modal" aria-hidden="true" role="dialog" aria-label="API settings">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>
+        <h2>API Settings</h2>
+        <p>Keys are written to <code>config/api_keys.json</code> (chmod 600) and mirrored to <code>.env</code>.
+           Saved values are never shown again — only a mask.</p>
+      </div>
+      <button class="btn tiny ghost" id="closeSettings" type="button">✕</button>
+    </div>
+
+    <h3 class="sec-title">Providers</h3>
+    <div id="providerList" class="provider-list"></div>
+
+    <h3 class="sec-title">Per-agent routing</h3>
+    <p class="sec-note">Each module loads its assigned provider dynamically via
+      <code>ApiKeyStore.resolve_for_agent()</code>.</p>
+    <div id="assignmentList" class="assignment-list"></div>
+
+    <div class="modal-foot">
+      <span id="storePath" class="mono"></span>
+      <button class="btn ghost" id="doneSettings" type="button">Done</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>
