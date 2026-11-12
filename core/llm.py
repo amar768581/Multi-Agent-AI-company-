@@ -18,6 +18,12 @@ from typing import Any, Dict, Optional
 
 SUPPORTED_PROVIDERS = ("gemini", "groq", "openai")
 
+# Cloudflare in front of Groq rejects urllib's default agent (error 1010), so
+# every provider call identifies the app explicitly.
+USER_AGENT = (
+    "CogniSphereLabs/1.0 (Termux; +https://github.com/amar768581/Multi-Agent-AI-company-)"
+)
+
 # Appended to the system prompt so every provider honours the requested language.
 LANGUAGE_INSTRUCTIONS = {
     "bn": (
@@ -88,7 +94,9 @@ async def generate(
 
 def _post_json(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int) -> Dict[str, Any]:
     body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    request = urllib.request.Request(
+        url, data=body, headers={**headers, "User-Agent": USER_AGENT}, method="POST"
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return json.loads(response.read().decode("utf-8"))

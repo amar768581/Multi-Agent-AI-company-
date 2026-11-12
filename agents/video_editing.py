@@ -29,6 +29,7 @@ from config.api_keys import ApiKeyStore
 from core.base_agent import AgentBase
 from core.events import EventBus
 from core.language import detect as detect_language, label, normalize_commands
+from core.llm import USER_AGENT
 
 AGENT_SPEC = {
     "id": "video_editing",
@@ -82,7 +83,9 @@ def _parse_range(value: str) -> Optional[Tuple[int, int]]:
 
 def _post_bytes(url: str, payload: Dict[str, Any], headers: Dict[str, str], timeout: int = 120) -> bytes:
     body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    request = urllib.request.Request(
+        url, data=body, headers={**headers, "User-Agent": USER_AGENT}, method="POST"
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             data = response.read()
