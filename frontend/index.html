@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#050810" />
 <title>CogniSphere Labs — Agent Pipeline</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
-<canvas id="bgfx" class="bgfx" aria-hidden="true"></canvas>
 <div class="grid-bg" aria-hidden="true"></div>
 <div class="vignette" aria-hidden="true"></div>
 
@@ -34,67 +34,30 @@
     <div class="panel-head">
       <h2>Organizational Pipeline</h2>
       <div class="panel-tools">
-        <div class="legend">
-          <span><i class="dot idle"></i>idle</span>
-          <span><i class="dot working"></i>active</span>
-          <span><i class="dot offline"></i>module pending</span>
+        <div class="hud-controls">
+          <span class="hud-fps"><i></i><b id="fpsCounter">60 FPS</b></span>
+          <label class="hud-speed" for="speedSlider">FLOW
+            <input id="speedSlider" type="range" min="0.4" max="2.8" step="0.1" value="1.2" />
+            <b id="speedValue">1.2x</b>
+          </label>
+          <button id="surgeBtn" class="btn tiny ghost" type="button">⚡ Surge</button>
+          <button id="pauseBtn" class="btn tiny ghost" type="button">Pause</button>
         </div>
         <button id="previewBtn" class="btn tiny primary" type="button">◱ 4K Preview</button>
       </div>
     </div>
 
-    <h1 class="iso-title">
-      <span class="iso-title-main">MULTI-AGENT AI COMPANY</span>
-      <span class="iso-title-sub">ORGANIZATIONAL WORKFLOW</span>
-    </h1>
-
-    <div class="iso-scene" id="stage">
-      <div class="iso-board" aria-hidden="true">
-        <span class="iso-board-grid"></span>
-      </div>
-
-      <svg id="pipes" class="pipes" aria-hidden="true"></svg>
-
-      <button class="iso-orb" id="hub" type="button" data-id="ceo_core" aria-label="Open CEO CORE chat">
-        <span class="orb-halo" aria-hidden="true"></span>
-        <span class="orb-pedestal" aria-hidden="true"><i></i><i></i></span>
-        <span class="orb-sphere">
-          <span class="orb-shine" aria-hidden="true"></span>
-          <strong>CEO</strong>
-          <em>CORE</em>
-        </span>
-        <span class="orb-status" id="hubStatus">online</span>
-        <span class="orb-bar"><i id="hubBar"></i></span>
-        <span class="orb-task" id="hubTask">awaiting directives</span>
-      </button>
-
-      <div class="iso-towers" id="towers"></div>
-
-      <div class="iso-subs" id="subs">
-        <div class="sub-group" data-group="script">
-          <div class="iso-sub" data-parent="script_writing"><span class="sub-icon">✎</span><span>Plot Planner</span></div>
-          <div class="iso-sub" data-parent="script_writing"><span class="sub-icon">❝</span><span>Dialogue Agent</span></div>
-        </div>
-        <div class="sub-group" data-group="video">
-          <div class="iso-sub" data-parent="video_generation"><span class="sub-icon">▣</span><span>Asset Creator</span></div>
-          <div class="iso-sub" data-parent="video_generation"><span class="sub-icon">◬</span><span>Animator</span></div>
-        </div>
-        <div class="sub-group" data-group="monitor">
-          <div class="iso-sub iso-sub-wide" id="monitorSub" data-parent="video_editing"><span class="sub-icon">◎</span><span>MONITORING / LOGGING</span></div>
-        </div>
-        <div class="sub-group" data-group="seo">
-          <div class="iso-sub" data-parent="seo_agent"><span class="sub-icon">⌕</span><span>Keyword Research</span></div>
-          <div class="iso-sub" data-parent="seo_agent"><span class="sub-icon">▤</span><span>On-Page Opt</span></div>
-        </div>
-      </div>
-
-      <div class="iso-sensor" id="sensorNode" aria-hidden="true">
-        <span class="sensor-led"></span>
-        <span>MONITORING/LOGGING</span>
+    <div class="workflow-stage" id="stage">
+      <canvas id="workflowCanvas" width="1920" height="1080"
+              aria-label="3D isometric multi-agent company workflow"></canvas>
+      <div id="workflowTip" class="workflow-tip" aria-hidden="true">
+        <strong id="wtTitle">AGENT NODE</strong>
+        <p id="wtDesc">Click to open this agent's chat.</p>
+        <span id="wtStatus">ACTIVE</span>
       </div>
     </div>
 
-    <p class="stage-hint">Click <b>CEO CORE</b> or any machine tower to open its isolated chat and API key manager.</p>
+    <p class="stage-hint">Click <b>CEO CORE</b> or any machine to open its isolated chat and API key manager.</p>
   </section>
 
   <aside class="side panel">
@@ -160,7 +123,7 @@
   <div class="preview-head">
     <div>
       <h2>Pipeline Studio — High-Res Preview</h2>
-      <p id="previewMeta">3840 × 2160 · vector render · live state</p>
+      <p id="previewMeta">3840 × 2160 · canvas render · live state</p>
     </div>
     <div class="preview-tools">
       <label class="preview-res">RES
@@ -176,7 +139,8 @@
     </div>
   </div>
   <div class="preview-stage">
-    <div class="preview-frame" id="previewStage"></div>
+    <canvas id="previewCanvas" class="preview-frame" width="1920" height="1080"
+            aria-label="4K pipeline preview"></canvas>
   </div>
   <p class="preview-note" id="previewNote">Live flow animation · PNG export at the selected resolution</p>
 </div>
@@ -210,6 +174,7 @@
 
 <div id="toastStack" class="toast-stack" role="status" aria-live="polite"></div>
 
+<script src="/assets/workflow-canvas.js"></script>
 <script src="/assets/app.js"></script>
 </body>
 </html>

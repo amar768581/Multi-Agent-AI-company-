@@ -942,9 +942,7 @@ function applyState(data) {
   state.missions = data.missions || [];
   state.settings = data.settings || state.settings;
 
-  buildNodes();
-  if (state.hub) updateHub(state.hub);
-  state.agents.forEach(updateNode);
+  if (window.WorkflowScene) window.WorkflowScene.setState(state.agents, state.hub);
   updateStats();
   appendLogs(data.logs);
   renderMissions();
@@ -1635,7 +1633,8 @@ function startBackgroundFx() {
 
 /* ---------------- wiring ---------------- */
 function wire() {
-  $("#hub").addEventListener("click", () => openChat("ceo_core"));
+  const hubButton = $("#hub");
+  if (hubButton) hubButton.addEventListener("click", () => openChat("ceo_core"));
   $("#closeDrawer").addEventListener("click", closeChat);
   $("#scrim").addEventListener("click", closeChat);
   $("#chatForm").addEventListener("submit", sendMessage);
@@ -1686,6 +1685,78 @@ function schedulePoll() {
   }, busy ? 500 : 1200);
 }
 
-startBackgroundFx();
 wire();
 tick(true).then(() => schedulePoll());
+
+/* ---------------- canvas 4K preview (overrides the SVG studio) ---------------- */
+let previewLoop = null;
+
+function drawPreviewFrame() {
+  const target = $("#previewCanvas");
+  const source = window.WorkflowScene && window.WorkflowScene.getCanvas();
+  if (!target || !source) return;
+  const ctx2 = target.getContext("2d");
+  ctx2.drawImage(source, 0, 0, target.width, target.height);
+}
+
+function openPreview() {
+  if (previewOpen) return;
+  previewOpen = true;
+  const modal = $("#preview");
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+  const target = $("#previewCanvas");
+  if (target) {
+    target.width = 1920;
+    target.height = 1080;
+    drawPreviewFrame();
+  }
+  const loop = () => {
+    if (!previewOpen) return;
+    drawPreviewFrame();
+    previewLoop = requestAnimationFrame(loop);
+  };
+  previewLoop = requestAnimationFrame(loop);
+}
+
+function closePreview() {
+  previewOpen = false;
+  if (previewLoop) cancelAnimationFrame(previewLoop);
+  previewLoop = null;
+  $("#preview").classList.remove("open");
+  $("#preview").setAttribute("aria-hidden", "true");
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+}
+
+function updatePreview() {
+  /* the studio mirrors the live canvas via its own animation loop */
+}
+
+async function downloadPreview() {
+  if (!window.WorkflowScene) return;
+  const [w, h] = PREVIEW_RES[$("#previewRes").value] || PREVIEW_RES["2160"];
+  try {
+    const canvas2 = document.createElement("canvas");
+    window.WorkflowScene.renderTo(canvas2, w / 1920, performance.now() / 1000);
+    const blob = await new Promise((resolve) => canvas2.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("PNG encode failed");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `cognisphere-workflow-${w}x${h}.png`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 4000);
+    toast(`Exported ${w} × ${h} PNG`);
+  } catch (err) {
+    toast(`Export failed: ${err.message}`, true);
+  }
+}
+
+function togglePreviewFullscreen() {
+  const el = $("#preview");
+  if (!document.fullscreenElement) {
+    if (el.requestFullscreen) el.requestFullscreen().catch(() => toast("Fullscreen blocked", true));
+    else toast("Fullscreen not supported here", true);
+  } else {
+    document.exitFullscreen?.();
+  }
+}

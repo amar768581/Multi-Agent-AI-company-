@@ -142,12 +142,14 @@ as well as in-memory state (API keys are untouched).
 
 - Animated pipeline: CEO CORE hub + 6 department nodes with live data-flow pipes
   (glowing packets that speed up while a department works), live status and progress.
-- **4K Pipeline Studio** preview: a 3840 × 2160 vector render of the live pipeline with
-  status/task/progress, PNG export at 4K/QHD/FHD, and fullscreen.
-- 3D isometric workflow board matching the reference art: golden CEO CORE orb, six
-  colour-coded machine towers with animated bays, sub-agent pedestals, right-angled glass
-  tubes with flowing energy packets, and a live notification stack (mission, department
-  status and API-key events) whose department toasts open the matching chat drawer.
+- **4K Pipeline Studio** preview: mirrors the live canvas scene and exports a true
+  3840 × 2160 PNG (plus QHD/FHD) with fullscreen.
+- Canvas-rendered 3D isometric workflow (`frontend/workflow-canvas.js`): golden CEO CORE
+  sphere, perspective metallic board, golden constellation mesh, six colour-coded machine
+  towers with animated bays, side robot helpers, sub-agent pedestals, glass pipes with
+  flowing energy packets, live status LEDs/progress, FPS + flow-speed + Surge/Pause HUD,
+  and a live notification stack (mission, department status and API-key events) whose
+  department toasts open the matching chat drawer.
 - Per-agent chat drawers (CEO CORE fully functional; departments answer as
   "module pending" until Phase 2 files land).
 - **API Settings** panel: separate keys for Gemini, Groq, OpenAI, ElevenLabs, HeyGen,

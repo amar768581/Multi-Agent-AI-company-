@@ -3,7 +3,7 @@
 > **Session protocol:** Read this file first. Resume from *Exact Next Step* only.
 > Never rewrite an existing module — extend it or replace it in place with a note here.
 
-Last updated: Session 10 (Phase 10 — 3D isometric workflow UI, live toasts, audit fixes)
+Last updated: Session 11 (Phase 11 — canvas-rendered 3D workflow stage)
 
 ---
 
@@ -11,8 +11,8 @@ Last updated: Session 10 (Phase 10 — 3D isometric workflow UI, live toasts, au
 
 | Field | Value |
 |---|---|
-| Phase | Phase 10 — 3D isometric workflow board, live notification stack, hardened reset + .env bootstrap |
-| Session | 10 |
+| Phase | Phase 11 — canvas-rendered 3D isometric workflow, live state overlays + 4K canvas export |
+| Session | 11 |
 | Backend | FastAPI (Termux-friendly, no compiled extras) |
 | Frontend | Vanilla HTML/CSS/JS served by FastAPI |
 | Departments live | **6 / 6** + compliance gate |
@@ -168,10 +168,26 @@ Last updated: Session 10 (Phase 10 — 3D isometric workflow UI, live toasts, au
       and `POST /api/system/reset` now awaits `CEOAgent.cancel_runner()` so an active
       background mission is cancelled and its task unwinds before state is cleared.
 
+### Phase 11 — canvas workflow stage
+- [x] `frontend/workflow-canvas.js` — the reference 1920 × 1080 canvas scene runs the whole
+      workflow: perspective metallic board, golden constellation mesh, bevelled title, CEO
+      CORE sphere, six colour-coded machine towers with animated bays (paper feed, film
+      frames, timeline, holographic scroll, lead avatar graph, SEO chart), side robot
+      helpers, glass pipes with couplings and flowing energy packets, sub-agent pedestals
+      and the upper monitoring node.
+- [x] Live wiring — `applyState` feeds agent statuses/progress to the renderer; working
+      machines animate faster, status LEDs and progress bars light up, and clicking a
+      machine/CEO (or a sub-agent) opens the existing chat drawer with its API key pool.
+      HUD adds live FPS, flow-speed slider, Surge and Pause controls.
+- [x] `frontend/app.js` — removed the DOM/SVG stage adapters and the SVG studio overrides;
+      the 4K Preview Studio now mirrors the live canvas and exports a true 3840 × 2160 PNG
+      by re-rendering the scene at 2× (verified 6.6 MB). Backend, key pools, drawers,
+      persistence and toasts untouched.
+
 ## Current Active Task
 
-Phase 10 verified in a browser: iso layout, live tubes, toast stack, drawer/API keys and
-4K export all working.
+Phase 11 verified in a browser: canvas scene, machine/CEO clicks, toasts and the 4K
+canvas export all working.
 
 ## Pending Work (hardening, not features)
 
