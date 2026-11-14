@@ -84,6 +84,8 @@
       <h3 id="drawerName">—</h3>
       <p id="drawerRole">—</p>
     </div>
+    <button class="btn tiny tts-toggle" id="ttsToggle" type="button" aria-pressed="true"
+            title="Agent replies are read aloud">🔊 Speak</button>
     <button class="btn tiny ghost" id="closeDrawer" type="button" aria-label="Close chat">✕</button>
   </div>
   <div class="drawer-meta" id="drawerMeta"></div>
@@ -111,11 +113,34 @@
   </section>
 
   <div class="chat-log" id="chatLog"></div>
+
+  <div class="voice-options">
+    <span class="voice-options-label">VOICE</span>
+    <div class="voice-lang" role="group" aria-label="Speech language">
+      <button class="lang-pill" type="button" data-voice-lang="en-US">EN</button>
+      <button class="lang-pill" type="button" data-voice-lang="bn-IN">বাংলা IN</button>
+      <button class="lang-pill" type="button" data-voice-lang="bn-BD">বাংলা BD</button>
+    </div>
+    <label class="voice-auto">
+      <input id="autoSendVoice" type="checkbox" /> auto-send
+    </label>
+    <span class="voice-state" id="voiceState">mic off</span>
+  </div>
+
   <form class="chat-form" id="chatForm">
-    <textarea id="chatInput" rows="2" placeholder="Direct instruction, feedback or approval…" required></textarea>
+    <div class="chat-input-wrap">
+      <textarea id="chatInput" rows="2" placeholder="Direct instruction, feedback or approval…" required></textarea>
+      <div class="voice-bar" id="voiceBar" hidden aria-live="polite">
+        <span class="voice-pulse" aria-hidden="true"></span>
+        <span class="voice-rec">REC</span>
+        <span class="voice-live" id="voiceLive"></span>
+      </div>
+    </div>
+    <button class="btn mic-btn" id="micBtn" type="button" aria-pressed="false"
+            aria-label="Start voice input" title="Voice input — tap to speak">🎙️</button>
     <button class="btn primary" id="sendBtn" type="submit">Send</button>
   </form>
-  <div class="drawer-foot">Ctrl+Enter sends · isolated per-agent context</div>
+  <div class="drawer-foot">Ctrl+Enter sends · isolated per-agent context · 🎙️ voice input</div>
 </aside>
 
 <!-- 4K pipeline preview -->

@@ -1031,10 +1031,15 @@ function displayName(role) {
 function appendMsg(role, label, text, scroll = true) {
   const log = $("#chatLog");
   const el = document.createElement("div");
-  el.className = `msg ${role === "user" ? "user" : "agent"}`;
-  el.innerHTML = `<span class="msg-label">${escapeHtml(label)}</span>${escapeHtml(text)}`;
+  const isAgent = role !== "user";
+  el.className = `msg ${isAgent ? "agent" : "user"}`;
+  const speakBtn = isAgent
+    ? `<button class="msg-speak" type="button" aria-label="Read this message aloud" title="Speak this message">🔊</button>`
+    : "";
+  el.innerHTML = `${speakBtn}<span class="msg-label">${escapeHtml(label)}</span><span class="msg-text">${escapeHtml(text)}</span>`;
   log.appendChild(el);
   if (scroll) log.scrollTop = log.scrollHeight;
+  return el;
 }
 
 async function openChat(id) {
@@ -1062,6 +1067,8 @@ async function openChat(id) {
 }
 
 function closeChat() {
+  stopVoiceCapture({ autoSend: false });
+  stopSpeaking();
   activeAgent = null;
   agentKeys = null;
   editingKeyId = null;
@@ -1087,6 +1094,7 @@ async function sendMessage(event) {
       body: JSON.stringify({ message: text }),
     });
     appendMsg("agent", agent ? agent.name : "AGENT", res.reply);
+    speakIfEnabled(res.reply);
     if (res.state) {
       res.state.logs = res.state.logs || [];
       applyState(res.state);
@@ -1099,6 +1107,344 @@ async function sendMessage(event) {
     btn.disabled = false;
     input.focus();
   }
+}
+
+/* ---------------- voice input (STT) / voice output (TTS) ---------------- */
+const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+const VOICE_PREF_KEY = "cognisphere.voice";
+const VOICE_LANGS = ["en-US", "bn-IN", "bn-BD"];
+
+const voice = {
+  lang: "en-US",
+  autoSend: false,
+  tts: true,
+  listening: false,
+  supported: !!SpeechRecognitionCtor,
+  baseText: "",
+  interim: "",
+  cancelAutoSend: false,
+  autoSendPending: false,
+  recognition: null,
+  speakingEl: null,
+};
+
+function ttsSupported() {
+  return typeof window.speechSynthesis !== "undefined" && typeof window.SpeechSynthesisUtterance !== "undefined";
+}
+
+function loadVoicePrefs() {
+  try {
+    const raw = localStorage.getItem(VOICE_PREF_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw) || {};
+    if (VOICE_LANGS.includes(saved.lang)) voice.lang = saved.lang;
+    if (typeof saved.autoSend === "boolean") voice.autoSend = saved.autoSend;
+    if (typeof saved.tts === "boolean") voice.tts = saved.tts;
+  } catch {
+    /* storage unavailable — defaults stay */
+  }
+}
+
+function saveVoicePrefs() {
+  try {
+    localStorage.setItem(
+      VOICE_PREF_KEY,
+      JSON.stringify({ lang: voice.lang, autoSend: voice.autoSend, tts: voice.tts })
+    );
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function updateVoiceState(mode) {
+  const el = $("#voiceState");
+  if (!el) return;
+  if (!voice.supported) {
+    el.textContent = "voice unsupported";
+    el.classList.remove("recording");
+    return;
+  }
+  if (mode === "listening" || voice.listening) {
+    el.textContent = "● recording";
+    el.classList.add("recording");
+    return;
+  }
+  el.classList.remove("recording");
+  if (!voice.tts) {
+    el.textContent = `${voice.lang} · tts muted`;
+    return;
+  }
+  const prefix = voice.lang.slice(0, 2).toLowerCase();
+  const count = ttsSupported()
+    ? (window.speechSynthesis.getVoices() || []).filter((v) =>
+        String(v.lang || "").toLowerCase().startsWith(prefix)
+      ).length
+    : 0;
+  el.textContent = `${voice.lang} · ${count} voice${count === 1 ? "" : "s"}`;
+}
+
+function setVoiceLang(lang) {
+  if (!VOICE_LANGS.includes(lang)) return;
+  if (voice.listening) stopVoiceCapture({ autoSend: false });
+  voice.lang = lang;
+  document.querySelectorAll("[data-voice-lang]").forEach((pill) => {
+    pill.classList.toggle("active", pill.dataset.voiceLang === lang);
+  });
+  if (voice.recognition) voice.recognition.lang = lang;
+  saveVoicePrefs();
+  updateVoiceState();
+}
+
+function markMic(listening) {
+  const mic = $("#micBtn");
+  if (!mic) return;
+  mic.classList.toggle("listening", listening);
+  mic.setAttribute("aria-pressed", listening ? "true" : "false");
+  mic.setAttribute("aria-label", listening ? "Stop voice input" : "Start voice input");
+  mic.title = listening ? "Listening — tap to stop" : "Voice input — tap to speak";
+}
+
+function showVoiceBar(show) {
+  const bar = $("#voiceBar");
+  if (bar) bar.hidden = !show;
+  if (!show) {
+    const live = $("#voiceLive");
+    if (live) live.textContent = "";
+  }
+}
+
+function paintTranscript() {
+  const input = $("#chatInput");
+  if (input && (voice.listening || voice.interim)) {
+    input.value = [voice.baseText, voice.interim].filter(Boolean).join(" ").trim();
+  }
+  const live = $("#voiceLive");
+  if (live) live.textContent = voice.interim ? voice.interim.slice(-42) : "…";
+}
+
+function startVoiceCapture() {
+  if (!voice.supported) {
+    toast("Voice input is not supported in this browser", true);
+    return;
+  }
+  if (voice.listening) return;
+  if (!activeAgent) return;
+  const input = $("#chatInput");
+  voice.baseText = input ? input.value.trim() : "";
+  voice.interim = "";
+  voice.cancelAutoSend = false;
+
+  const rec = new SpeechRecognitionCtor();
+  rec.lang = voice.lang;
+  rec.interimResults = true;
+  rec.continuous = false;
+  rec.maxAlternatives = 1;
+
+  rec.onstart = () => {
+    voice.listening = true;
+    markMic(true);
+    showVoiceBar(true);
+    paintTranscript();
+    updateVoiceState("listening");
+  };
+
+  rec.onresult = (event) => {
+    let interim = "";
+    let finals = "";
+    for (let i = event.resultIndex; i < event.results.length; i += 1) {
+      const result = event.results[i];
+      const transcript = result[0] ? result[0].transcript : "";
+      if (result.isFinal) finals += transcript;
+      else interim += transcript;
+    }
+    if (finals.trim()) voice.baseText = [voice.baseText, finals.trim()].filter(Boolean).join(" ");
+    voice.interim = interim.trim();
+    paintTranscript();
+  };
+
+  rec.onerror = (event) => {
+    const code = (event && event.error) || "error";
+    if (code === "not-allowed" || code === "service-not-allowed") {
+      toast("Microphone blocked — allow mic access to use voice input", true);
+    } else if (code === "audio-capture") {
+      toast("No microphone was found on this device", true);
+    } else if (code !== "aborted" && code !== "no-speech") {
+      toast(`Voice input error: ${code}`, true);
+    }
+  };
+
+  rec.onend = () => {
+    const wasListening = voice.listening;
+    voice.listening = false;
+    voice.recognition = null;
+    markMic(false);
+    showVoiceBar(false);
+    paintTranscript();
+    voice.interim = "";
+    updateVoiceState();
+    const text = input ? input.value.trim() : "";
+    if (wasListening && voice.autoSend && text && !voice.cancelAutoSend && activeAgent) {
+      voice.autoSendPending = true;
+      setTimeout(() => {
+        if (!voice.autoSendPending) return;
+        voice.autoSendPending = false;
+        if (activeAgent) sendMessage();
+      }, 250);
+    }
+    voice.cancelAutoSend = false;
+  };
+
+  voice.recognition = rec;
+  try {
+    rec.start();
+  } catch (err) {
+    voice.recognition = null;
+    toast(`Could not start voice input: ${err.message}`, true);
+  }
+}
+
+function stopVoiceCapture(opts = {}) {
+  voice.autoSendPending = false;
+  if (opts.autoSend === false) voice.cancelAutoSend = true;
+  const rec = voice.recognition;
+  if (!rec) return;
+  try {
+    rec.stop();
+  } catch {
+    voice.listening = false;
+    markMic(false);
+    showVoiceBar(false);
+  }
+}
+
+function toggleVoiceCapture() {
+  if (!voice.supported) {
+    toast("Voice input needs SpeechRecognition — try Chrome, Edge or Android Chrome", true);
+    return;
+  }
+  if (voice.listening) stopVoiceCapture();
+  else startVoiceCapture();
+}
+
+function voicesForLang(lang) {
+  if (!ttsSupported()) return [];
+  const all = window.speechSynthesis.getVoices() || [];
+  const norm = (value) => String(value || "").toLowerCase().replace("_", "-");
+  const exact = all.filter((v) => norm(v.lang) === norm(lang));
+  if (exact.length) return exact;
+  const prefix = lang.slice(0, 2).toLowerCase();
+  return all.filter((v) => norm(v.lang).startsWith(prefix));
+}
+
+function clearSpeaking() {
+  if (voice.speakingEl) voice.speakingEl.classList.remove("speaking");
+  voice.speakingEl = null;
+}
+
+function stopSpeaking() {
+  if (ttsSupported()) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      /* nothing queued */
+    }
+  }
+  clearSpeaking();
+}
+
+function speakText(text, opts = {}) {
+  const plain = String(text || "").trim();
+  if (!plain || !ttsSupported()) return false;
+  stopSpeaking();
+  const utter = new SpeechSynthesisUtterance(plain.slice(0, 6000));
+  const matches = voicesForLang(voice.lang);
+  if (matches.length) utter.voice = matches[0];
+  utter.lang = matches.length ? matches[0].lang : voice.lang;
+  utter.rate = voice.lang.startsWith("bn") ? 0.92 : 1.02;
+  utter.pitch = 1;
+  utter.onend = clearSpeaking;
+  utter.onerror = clearSpeaking;
+  if (opts.el) {
+    voice.speakingEl = opts.el;
+    opts.el.classList.add("speaking");
+  }
+  try {
+    window.speechSynthesis.speak(utter);
+  } catch (err) {
+    clearSpeaking();
+    toast(`Speech output failed: ${err.message}`, true);
+    return false;
+  }
+  return true;
+}
+
+/* Agent replies are read aloud automatically while TTS is unmuted. */
+function speakIfEnabled(text) {
+  if (!voice.tts || !ttsSupported()) return;
+  const plain = String(text || "").trim();
+  if (!plain) return;
+  const buttons = document.querySelectorAll("#chatLog .msg.agent .msg-speak");
+  const lastBtn = buttons.length ? buttons[buttons.length - 1] : null;
+  speakText(plain, { el: lastBtn });
+}
+
+function toggleTts() {
+  voice.tts = !voice.tts;
+  if (!voice.tts) stopSpeaking();
+  saveVoicePrefs();
+  applyTtsButton();
+  updateVoiceState();
+}
+
+function applyTtsButton() {
+  const btn = $("#ttsToggle");
+  if (!btn) return;
+  const on = voice.tts && ttsSupported();
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  btn.textContent = on ? "🔊 Speak" : "🔇 Mute";
+  btn.title = on
+    ? "Agent replies are read aloud — click to mute"
+    : "Voice output muted — click to speak replies";
+}
+
+/* Per-message speaker button (event delegation on the chat log). */
+function onChatLogClick(event) {
+  const btn = event.target.closest(".msg-speak");
+  if (!btn) return;
+  if (!ttsSupported()) {
+    toast("Speech output is not supported in this browser", true);
+    return;
+  }
+  if (btn.classList.contains("speaking")) {
+    stopSpeaking();
+    return;
+  }
+  const bubble = btn.closest(".msg");
+  const textEl = bubble ? bubble.querySelector(".msg-text") : null;
+  const text = textEl ? textEl.textContent.trim() : "";
+  if (text) speakText(text, { el: btn });
+}
+
+function initVoice() {
+  loadVoicePrefs();
+  document.querySelectorAll("[data-voice-lang]").forEach((pill) => {
+    pill.classList.toggle("active", pill.dataset.voiceLang === voice.lang);
+  });
+  const auto = $("#autoSendVoice");
+  if (auto) auto.checked = !!voice.autoSend;
+  const mic = $("#micBtn");
+  if (mic && !voice.supported) {
+    mic.classList.add("unsupported");
+    mic.setAttribute("aria-disabled", "true");
+    mic.title = "Voice input needs SpeechRecognition (Chrome / Edge / Android Chrome)";
+  }
+  if (!ttsSupported()) voice.tts = false;
+  applyTtsButton();
+  updateVoiceState();
+  if (ttsSupported()) {
+    window.speechSynthesis.onvoiceschanged = () => updateVoiceState();
+  }
+  window.addEventListener("beforeunload", stopSpeaking);
 }
 
 /* ---------------- per-agent key manager ---------------- */
@@ -1638,6 +1984,18 @@ function wire() {
   $("#closeDrawer").addEventListener("click", closeChat);
   $("#scrim").addEventListener("click", closeChat);
   $("#chatForm").addEventListener("submit", sendMessage);
+  $("#micBtn").addEventListener("click", toggleVoiceCapture);
+  $("#ttsToggle").addEventListener("click", toggleTts);
+  $("#chatLog").addEventListener("click", onChatLogClick);
+  $("#autoSendVoice").addEventListener("change", (e) => {
+    voice.autoSend = e.target.checked;
+    voice.autoSendPending = false;
+    saveVoicePrefs();
+  });
+  document.querySelectorAll("[data-voice-lang]").forEach((pill) => {
+    pill.addEventListener("click", () => setVoiceLang(pill.dataset.voiceLang));
+  });
+  initVoice();
   $("#agentKeyForm").addEventListener("submit", addAgentKey);
   $("#toggleAgentKeys").addEventListener("click", toggleAgentKeys);
   $("#agentProvider").addEventListener("change", changeAgentProvider);
