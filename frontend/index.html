@@ -50,6 +50,27 @@
     <div class="workflow-stage" id="stage">
       <canvas id="workflowCanvas" width="1920" height="1080"
               aria-label="3D isometric multi-agent company workflow"></canvas>
+      <button id="ceoPresence" class="ceo-presence" type="button" aria-label="Open CEO CORE briefing">
+        <span class="ceo-avatar" aria-hidden="true">
+          <span class="ceo-hair"></span>
+          <span class="ceo-face">
+            <i class="ceo-eye left"></i><i class="ceo-eye right"></i>
+            <i class="ceo-brow left"></i><i class="ceo-brow right"></i>
+            <i class="ceo-mouth"></i>
+          </span>
+          <span class="ceo-neck"></span>
+          <span class="ceo-jacket"><i></i><b></b></span>
+          <span class="ceo-signal"></span>
+        </span>
+        <span class="ceo-presence-copy">
+          <span class="ceo-presence-kicker">CEO CONTROL ROOM</span>
+          <strong>Alex Morgan</strong>
+          <span class="ceo-presence-role">Chief Orchestration Officer</span>
+          <span class="ceo-presence-status"><i id="ceoPresenceDot"></i><b id="ceoPresenceStatus">ONLINE</b></span>
+          <span id="ceoPresenceActivity" class="ceo-presence-activity">Monitoring all departments</span>
+        </span>
+        <span class="ceo-presence-ping" aria-hidden="true"></span>
+      </button>
       <div id="workflowTip" class="workflow-tip" aria-hidden="true">
         <strong id="wtTitle">AGENT NODE</strong>
         <p id="wtDesc">Click to open this agent's chat.</p>
@@ -65,6 +86,18 @@
       <h2>Live Monitor</h2>
       <button id="resetBtn" class="btn tiny ghost" type="button">reset session</button>
     </div>
+    <section class="activity-panel" aria-labelledby="activityTitle">
+      <div class="activity-head">
+        <div>
+          <span class="activity-kicker">REAL-TIME SIGNAL</span>
+          <h3 id="activityTitle">CEO Activity</h3>
+        </div>
+        <span class="activity-live"><i></i> LIVE</span>
+      </div>
+      <div id="activityFeed" class="activity-feed" aria-live="polite">
+        <p class="empty">Waiting for the first executive signal.</p>
+      </div>
+    </section>
     <div id="logs" class="logs" aria-live="polite"></div>
 
     <div class="panel-head sub">

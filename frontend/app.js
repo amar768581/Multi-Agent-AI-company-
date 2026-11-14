@@ -72,6 +72,7 @@ let activeAgent = null;
 let built = false;
 let ticking = false;
 let pipeRaf = null;
+const activityHistory = [];
 const nodeEls = new Map();
 
 /* ---------------- helpers ---------------- */
@@ -204,6 +205,24 @@ function updateHub(hub) {
   $("#hubBar").style.width = `${hub.progress || 0}%`;
   $("#hubTask").textContent = hub.current_task || "awaiting directives";
   $("#hub").title = `CEO CORE · ${hub.status} · ${hub.live_departments || 0}/${hub.total_departments || 0} departments live`;
+}
+
+function updateCeoPresence(hub) {
+  const card = $("#ceoPresence");
+  if (!card || !hub) return;
+  const statusEl = $("#ceoPresenceStatus");
+  const activityEl = $("#ceoPresenceActivity");
+  const dot = $("#ceoPresenceDot");
+  const busy = ["working", "orchestrating"].includes(hub.status);
+  const blocked = hub.status === "awaiting_modules";
+  card.classList.toggle("is-busy", busy);
+  card.classList.toggle("is-blocked", blocked);
+  if (statusEl) statusEl.textContent = statusLabel(hub.status);
+  if (dot) dot.style.color = blocked ? "#ff9a8b" : busy ? "#ffe08a" : "#6ee7b7";
+  if (activityEl) {
+    activityEl.textContent = hub.current_task || (busy ? "Coordinating department work" : "Monitoring all departments");
+  }
+  card.title = `${statusLabel(hub.status)} · ${hub.current_task || "Open CEO briefing"}`;
 }
 
 /* ---------------- pipes ---------------- */
@@ -783,6 +802,7 @@ function appendLogs(entries) {
   const stick = container.scrollTop + container.clientHeight >= container.scrollHeight - 40;
   fresh.forEach((entry) => {
     lastSeq = Math.max(lastSeq, entry.seq);
+    activityHistory.push(entry);
     const line = document.createElement("div");
     line.className = `log-line ${entry.level || "info"}`;
     const time = new Date((entry.at || Date.now() / 1000) * 1000);
@@ -793,7 +813,46 @@ function appendLogs(entries) {
     container.appendChild(line);
   });
   while (container.children.length > 300) container.removeChild(container.firstChild);
+  while (activityHistory.length > 80) activityHistory.shift();
+  renderActivityFeed();
   if (stick) container.scrollTop = container.scrollHeight;
+}
+
+function renderActivityFeed() {
+  const feed = $("#activityFeed");
+  if (!feed) return;
+  const items = [];
+  const hub = state.hub || {};
+  items.push({
+    label: "CEO CORE",
+    message: hub.current_task || (hub.status === "idle" ? "Waiting for a strategic directive" : `Status: ${statusLabel(hub.status)}`),
+    time: "now",
+    color: hub.status === "awaiting_modules" ? "#ff9a8b" : "#FFD700",
+  });
+  const active = (state.agents || []).filter((agent) => ACTIVE_STATUSES.has(agent.status) || missionsActiveFor(agent.id));
+  active.slice(0, 2).forEach((agent) => {
+    items.push({
+      label: deptName(agent.id),
+      message: agent.current_task || "Processing a delegated task",
+      time: "live",
+      color: deptColor(agent.id),
+    });
+  });
+  activityHistory.slice(-4).reverse().forEach((entry) => {
+    if (entry.source === "system" && !entry.message) return;
+    const timestamp = entry.at ? new Date(entry.at * 1000).toTimeString().slice(0, 5) : "--:--";
+    items.push({
+      label: String(entry.source || "SYSTEM").replace(/_/g, " ").toUpperCase(),
+      message: entry.message || "Signal received",
+      time: timestamp,
+      color: entry.level === "error" ? "#ff7a6b" : entry.level === "warn" ? "#ffc94d" : "#6ee7b7",
+    });
+  });
+  feed.innerHTML = items.slice(0, 7).map((item) => `
+    <div class="activity-item" style="--activity-color:${item.color}">
+      <div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.message)}</span></div>
+      <time>${escapeHtml(item.time)}</time>
+    </div>`).join("");
 }
 
 function escapeHtml(value) {
@@ -943,8 +1002,10 @@ function applyState(data) {
   state.settings = data.settings || state.settings;
 
   if (window.WorkflowScene) window.WorkflowScene.setState(state.agents, state.hub);
+  updateCeoPresence(state.hub);
   updateStats();
   appendLogs(data.logs);
+  renderActivityFeed();
   renderMissions();
   schedulePipes();
   notifyChanges(prevAgents, prevMission, data.logs);
@@ -1981,6 +2042,8 @@ function startBackgroundFx() {
 function wire() {
   const hubButton = $("#hub");
   if (hubButton) hubButton.addEventListener("click", () => openChat("ceo_core"));
+  const ceoPresence = $("#ceoPresence");
+  if (ceoPresence) ceoPresence.addEventListener("click", () => openChat("ceo_core"));
   $("#closeDrawer").addEventListener("click", closeChat);
   $("#scrim").addEventListener("click", closeChat);
   $("#chatForm").addEventListener("submit", sendMessage);

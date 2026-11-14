@@ -1073,53 +1073,25 @@
     const busy = hubState.status === "orchestrating" || hubState.status === "working";
     c.save();
 
-    const aura = c.createRadialGradient(x, y, r * 0.3, x, y, r * 1.55);
-    aura.addColorStop(0, busy ? "rgba(255, 240, 180, 0.95)" : "rgba(255, 230, 128, 0.85)");
-    aura.addColorStop(0.5, "rgba(245, 158, 11, 0.35)");
-    aura.addColorStop(1, "rgba(245, 158, 11, 0)");
+    // The human CEO card is rendered by HTML above the canvas. Keep only a
+    // restrained halo/connection target here so the old abstract orb is gone.
+    const pulse = r * (1.05 + Math.sin(t * (busy ? 4.2 : 2.2)) * 0.08);
+    const aura = c.createRadialGradient(x, y, r * 0.12, x, y, r * 1.4);
+    aura.addColorStop(0, busy ? "rgba(110, 231, 183, 0.24)" : "rgba(255, 215, 0, 0.16)");
+    aura.addColorStop(1, "rgba(255, 215, 0, 0)");
     c.fillStyle = aura;
-    c.beginPath(); c.arc(x, y, r * (busy ? 1.65 : 1.55), 0, Math.PI * 2); c.fill();
+    c.beginPath();
+    c.arc(x, y, r * 1.35, 0, Math.PI * 2);
+    c.fill();
 
-    const sphereGrad = c.createRadialGradient(x - 24, y - 28, 10, x, y, r);
-    sphereGrad.addColorStop(0, "#fffbeb");
-    sphereGrad.addColorStop(0.35, "#fcd34d");
-    sphereGrad.addColorStop(0.75, "#b45309");
-    sphereGrad.addColorStop(1, "#451a03");
-    c.fillStyle = sphereGrad;
-    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill();
-
-    c.save();
-    c.beginPath(); c.arc(x, y, r - 4, 0, Math.PI * 2); c.clip();
-    for (let i = 0; i < 28; i++) {
-      const ang = i * 2.23 + t * (0.8 + (i % 3) * 0.3) * flowSpeed * (busy ? 1.5 : 1);
-      const dist = (i * 19 + t * 25) % (r - 12);
-      const px = x + Math.cos(ang) * dist;
-      const py = y + Math.sin(ang) * dist * 0.85;
-      const sz = 1.5 + (i % 3);
-      c.fillStyle = i % 2 === 0 ? "#ffffff" : "#fde047";
-      c.globalAlpha = 0.55 + 0.45 * Math.sin(t * 5 + i);
-      c.beginPath(); c.arc(px, py, sz, 0, Math.PI * 2); c.fill();
-    }
-    c.restore();
-
-    c.strokeStyle = "#fde68a"; c.lineWidth = 3;
-    c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.stroke();
-    c.strokeStyle = "rgba(255, 255, 255, 0.65)"; c.lineWidth = 4;
-    c.beginPath(); c.arc(x, y, r - 6, -Math.PI * 0.78, -Math.PI * 0.25); c.stroke();
-
-    c.font = '900 38px "Orbitron", sans-serif';
-    c.textAlign = "center";
-    c.textBaseline = "middle";
-    c.fillStyle = "#291504";
-    c.fillText("CEO", x + 2, y - 15);
-    c.fillText("CORE", x + 2, y + 23);
-    const txtGrad = c.createLinearGradient(x, y - 36, x, y + 38);
-    txtGrad.addColorStop(0, "#ffffff");
-    txtGrad.addColorStop(0.5, "#e2e8f0");
-    txtGrad.addColorStop(1, "#94a3b8");
-    c.fillStyle = txtGrad;
-    c.fillText("CEO", x, y - 17);
-    c.fillText("CORE", x, y + 21);
+    c.strokeStyle = busy ? "rgba(110, 231, 183, 0.7)" : "rgba(255, 215, 0, 0.52)";
+    c.lineWidth = 2;
+    c.setLineDash([5, 12]);
+    c.lineDashOffset = -t * 16;
+    c.beginPath();
+    c.arc(x, y, pulse, 0, Math.PI * 2);
+    c.stroke();
+    c.setLineDash([]);
     c.restore();
   }
 
