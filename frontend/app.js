@@ -212,9 +212,16 @@ function updateCeoPresence(hub) {
   if (!card || !hub) return;
   const statusEl = $("#ceoPresenceStatus");
   const activityEl = $("#ceoPresenceActivity");
+  const briefEl = $("#ceoPresenceBrief");
+  const deptCountEl = $("#ceoDeptCount");
+  const missionCountEl = $("#ceoMissionCount");
+  const signalEl = $("#ceoSignalState");
   const dot = $("#ceoPresenceDot");
   const busy = ["working", "orchestrating"].includes(hub.status);
   const blocked = hub.status === "awaiting_modules";
+  const liveDepartments = hub.live_departments ?? state.agents.filter((agent) => agent.status === "working").length;
+  const totalDepartments = hub.total_departments ?? state.agents.length ?? 6;
+  const mission = state.missions[state.missions.length - 1];
   card.classList.toggle("is-busy", busy);
   card.classList.toggle("is-blocked", blocked);
   if (statusEl) statusEl.textContent = statusLabel(hub.status);
@@ -222,6 +229,16 @@ function updateCeoPresence(hub) {
   if (activityEl) {
     activityEl.textContent = hub.current_task || (busy ? "Coordinating department work" : "Monitoring all departments");
   }
+  if (briefEl) {
+    briefEl.textContent = blocked
+      ? "Some modules need attention before execution can continue."
+      : busy
+        ? "The CEO is actively coordinating the current mission."
+        : "All departments are standing by for your directive.";
+  }
+  if (deptCountEl) deptCountEl.textContent = `${liveDepartments}/${totalDepartments}`;
+  if (missionCountEl) missionCountEl.textContent = String(state.missions.length || 0);
+  if (signalEl) signalEl.textContent = blocked ? "BLOCKED" : busy ? "BUSY" : mission ? "TRACKING" : "READY";
   card.title = `${statusLabel(hub.status)} · ${hub.current_task || "Open CEO briefing"}`;
 }
 

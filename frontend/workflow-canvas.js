@@ -1069,30 +1069,9 @@
   }
 
   function renderCeoCoreOrb(c, t) {
-    const { x, y, r } = CEO_CORE;
-    const busy = hubState.status === "orchestrating" || hubState.status === "working";
-    c.save();
-
-    // The human CEO card is rendered by HTML above the canvas. Keep only a
-    // restrained halo/connection target here so the old abstract orb is gone.
-    const pulse = r * (1.05 + Math.sin(t * (busy ? 4.2 : 2.2)) * 0.08);
-    const aura = c.createRadialGradient(x, y, r * 0.12, x, y, r * 1.4);
-    aura.addColorStop(0, busy ? "rgba(110, 231, 183, 0.24)" : "rgba(255, 215, 0, 0.16)");
-    aura.addColorStop(1, "rgba(255, 215, 0, 0)");
-    c.fillStyle = aura;
-    c.beginPath();
-    c.arc(x, y, r * 1.35, 0, Math.PI * 2);
-    c.fill();
-
-    c.strokeStyle = busy ? "rgba(110, 231, 183, 0.7)" : "rgba(255, 215, 0, 0.52)";
-    c.lineWidth = 2;
-    c.setLineDash([5, 12]);
-    c.lineDashOffset = -t * 16;
-    c.beginPath();
-    c.arc(x, y, pulse, 0, Math.PI * 2);
-    c.stroke();
-    c.setLineDash([]);
-    c.restore();
+    // The HTML executive command panel fully replaces the old CEO orb.
+    // Keep the canvas target for hit-testing, but draw no abstract sphere.
+    return;
   }
 
   function renderSurgeBursts(c, t) {

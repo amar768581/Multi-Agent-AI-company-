@@ -7,7 +7,7 @@
 <title>CogniSphere Labs — Agent Pipeline</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Rajdhani:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/assets/styles.css" />
+<link rel="stylesheet" href="/assets/styles.css?v=20261114-ceo-command" />
 </head>
 <body>
 <div class="grid-bg" aria-hidden="true"></div>
@@ -51,23 +51,37 @@
       <canvas id="workflowCanvas" width="1920" height="1080"
               aria-label="3D isometric multi-agent company workflow"></canvas>
       <button id="ceoPresence" class="ceo-presence" type="button" aria-label="Open CEO CORE briefing">
-        <span class="ceo-avatar" aria-hidden="true">
-          <span class="ceo-hair"></span>
-          <span class="ceo-face">
-            <i class="ceo-eye left"></i><i class="ceo-eye right"></i>
-            <i class="ceo-brow left"></i><i class="ceo-brow right"></i>
-            <i class="ceo-mouth"></i>
-          </span>
-          <span class="ceo-neck"></span>
-          <span class="ceo-jacket"><i></i><b></b></span>
-          <span class="ceo-signal"></span>
+        <span class="ceo-presence-top">
+          <span class="ceo-presence-kicker"><i></i> CEO CONTROL ROOM</span>
+          <span class="ceo-presence-live">LIVE COMMAND</span>
         </span>
-        <span class="ceo-presence-copy">
-          <span class="ceo-presence-kicker">CEO CONTROL ROOM</span>
-          <strong>Alex Morgan</strong>
-          <span class="ceo-presence-role">Chief Orchestration Officer</span>
-          <span class="ceo-presence-status"><i id="ceoPresenceDot"></i><b id="ceoPresenceStatus">ONLINE</b></span>
-          <span id="ceoPresenceActivity" class="ceo-presence-activity">Monitoring all departments</span>
+        <span class="ceo-presence-main">
+          <span class="ceo-avatar" aria-hidden="true">
+            <span class="ceo-hair"></span>
+            <span class="ceo-face">
+              <i class="ceo-eye left"></i><i class="ceo-eye right"></i>
+              <i class="ceo-brow left"></i><i class="ceo-brow right"></i>
+              <i class="ceo-mouth"></i>
+            </span>
+            <span class="ceo-neck"></span>
+            <span class="ceo-jacket"><i></i><b></b></span>
+            <span class="ceo-signal"></span>
+          </span>
+          <span class="ceo-presence-copy">
+            <strong>Alex Morgan</strong>
+            <span class="ceo-presence-role">Chief Orchestration Officer</span>
+            <span class="ceo-presence-status"><i id="ceoPresenceDot"></i><b id="ceoPresenceStatus">ONLINE</b></span>
+            <span id="ceoPresenceActivity" class="ceo-presence-activity">Monitoring all departments</span>
+          </span>
+          <span class="ceo-presence-brief">
+            <b>EXECUTIVE BRIEF</b>
+            <span id="ceoPresenceBrief">All departments are standing by for your directive.</span>
+          </span>
+        </span>
+        <span class="ceo-presence-metrics" aria-label="CEO overview metrics">
+          <span><b id="ceoDeptCount">6/6</b><small>DEPARTMENTS</small></span>
+          <span><b id="ceoMissionCount">0</b><small>MISSIONS</small></span>
+          <span><b id="ceoSignalState">READY</b><small>SIGNAL</small></span>
         </span>
         <span class="ceo-presence-ping" aria-hidden="true"></span>
       </button>
@@ -78,7 +92,7 @@
       </div>
     </div>
 
-    <p class="stage-hint">Click <b>CEO CORE</b> or any machine to open its isolated chat and API key manager.</p>
+      <p class="stage-hint">Click the executive command panel or any machine to open its isolated chat and API key manager.</p>
   </section>
 
   <aside class="side panel">
@@ -232,7 +246,7 @@
 
 <div id="toastStack" class="toast-stack" role="status" aria-live="polite"></div>
 
-<script src="/assets/workflow-canvas.js"></script>
-<script src="/assets/app.js"></script>
+<script src="/assets/workflow-canvas.js?v=20261114-ceo-command"></script>
+<script src="/assets/app.js?v=20261114-ceo-command"></script>
 </body>
 </html>

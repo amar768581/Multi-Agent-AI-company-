@@ -1241,6 +1241,80 @@ body { position: relative; overflow-x: hidden; padding-bottom: 28px; }
 }
 
 /* ============================================================
+   CEO COMMAND PANEL V2
+   A visible executive surface that replaces the old orb overlay.
+   ============================================================ */
+.ceo-presence {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  left: 50%;
+  top: 22px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  width: min(470px, calc(100% - 32px));
+  min-height: 190px;
+  padding: 14px 16px 13px;
+  border: 1px solid rgba(255, 215, 0, .52);
+  border-radius: 21px;
+  background:
+    radial-gradient(circle at 15% 0%, rgba(255, 215, 0, .16), transparent 35%),
+    linear-gradient(135deg, rgba(25, 27, 31, .97), rgba(7, 11, 19, .97) 72%);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, .7), 0 0 46px rgba(255, 215, 0, .15), inset 0 1px 0 rgba(255, 255, 255, .12);
+  color: #f8f1df;
+  font: inherit;
+  overflow: hidden;
+}
+.ceo-presence:hover, .ceo-presence:focus-visible {
+  transform: translateX(-50%) translateY(-4px);
+  border-color: rgba(255, 232, 145, .92);
+  box-shadow: 0 31px 78px rgba(0, 0, 0, .76), 0 0 54px rgba(255, 215, 0, .24), inset 0 1px 0 rgba(255, 255, 255, .15);
+}
+.ceo-presence-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ceo-presence-kicker { display: inline-flex; align-items: center; gap: 7px; color: #ffe28b; font: 800 9px/1 var(--mono); letter-spacing: .18em; }
+.ceo-presence-kicker i { width: 7px; height: 7px; border-radius: 50%; background: #6ee7b7; box-shadow: 0 0 0 4px rgba(110, 231, 183, .1), 0 0 14px #6ee7b7; animation: ceoSignal 1.7s ease-in-out infinite; }
+.ceo-presence-live { color: #76849b; font: 800 8px/1 var(--mono); letter-spacing: .14em; }
+.ceo-presence-main { display: grid; grid-template-columns: 78px minmax(125px, 1fr) minmax(130px, 1.05fr); align-items: center; gap: 12px; min-width: 0; }
+.ceo-avatar { width: 72px; height: 86px; transform: scale(1.12); transform-origin: center bottom; }
+.ceo-presence-copy { gap: 4px; }
+.ceo-presence strong { color: #fff8e5; font-size: 17px; letter-spacing: .01em; }
+.ceo-presence-role { color: #aab6c9; font-size: 10px; }
+.ceo-presence-status { margin-top: 2px; font-size: 9px; letter-spacing: .14em; }
+.ceo-presence-activity { color: #d9c88c; font-size: 10px; line-height: 1.25; white-space: normal; }
+.ceo-presence-brief { min-width: 0; padding-left: 12px; border-left: 1px solid rgba(255, 215, 0, .22); display: flex; flex-direction: column; gap: 5px; }
+.ceo-presence-brief b { color: #d6b75e; font: 800 8px/1 var(--mono); letter-spacing: .14em; }
+.ceo-presence-brief span { color: #9eabc0; font-size: 10px; line-height: 1.35; }
+.ceo-presence-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.ceo-presence-metrics span { display: flex; flex-direction: column; gap: 3px; padding: 7px 8px; border: 1px solid rgba(255, 215, 0, .15); border-radius: 10px; background: rgba(255, 255, 255, .035); text-align: left; }
+.ceo-presence-metrics b { color: #fff1bb; font: 800 13px/1 var(--mono); }
+.ceo-presence-metrics small { color: #77849a; font: 800 7px/1 var(--mono); letter-spacing: .1em; }
+.ceo-presence-ping { right: 15px; top: 15px; }
+.ceo-presence.is-busy { border-color: rgba(110, 231, 183, .72); box-shadow: 0 26px 70px rgba(0, 0, 0, .7), 0 0 50px rgba(110, 231, 183, .18); }
+.ceo-presence.is-blocked { border-color: rgba(255, 154, 139, .72); box-shadow: 0 26px 70px rgba(0, 0, 0, .7), 0 0 50px rgba(255, 154, 139, .16); }
+.activity-panel { padding: 14px 14px 12px; background: linear-gradient(135deg, rgba(255, 215, 0, .09), rgba(7, 9, 15, .35) 55%); }
+.activity-head { margin-bottom: 12px; }
+.activity-kicker { color: #d4b25c; font-size: 8px; }
+.activity-head h3 { margin-top: 4px; font-size: 15px; letter-spacing: .04em; }
+.activity-live { padding: 4px 7px; border: 1px solid rgba(110, 231, 183, .24); border-radius: 999px; background: rgba(110, 231, 183, .06); }
+.activity-feed { max-height: 230px; gap: 6px; }
+.activity-item { grid-template-columns: 7px minmax(0, 1fr) auto; padding: 8px 9px 8px 8px; border-color: rgba(255, 215, 0, .16); background: rgba(5, 8, 14, .66); }
+.activity-item strong { font-size: 10px; }
+.activity-item span { font-size: 9px; }
+
+@media (max-width: 980px) {
+  .ceo-presence { top: 15px; width: min(470px, calc(100% - 24px)); }
+}
+@media (max-width: 620px) {
+  .ceo-presence { min-height: 0; padding: 12px; }
+  .ceo-presence-main { grid-template-columns: 66px minmax(0, 1fr); }
+  .ceo-avatar { transform: scale(.95); }
+  .ceo-presence-brief { display: none; }
+  .ceo-presence-metrics { gap: 5px; }
+}
+
+/* ============================================================
    CANVAS WORKFLOW STAGE
    ============================================================ */
 .workflow-stage {
